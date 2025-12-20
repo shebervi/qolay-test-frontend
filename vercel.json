@@ -1,0 +1,51 @@
+{
+    "rewrites": [
+      {
+        "source": "/guests.html",
+        "destination": "/guests.html"
+      },
+      {
+        "source": "/menu.html",
+        "destination": "/menu.html"
+      },
+      {
+        "source": "/cart.html",
+        "destination": "/cart.html"
+      },
+      {
+        "source": "/restaurants.html",
+        "destination": "/restaurants.html"
+      },
+      {
+        "source": "/restaurant-menu.html",
+        "destination": "/restaurant-menu.html"
+      },
+      {
+        "source": "/product-detail.html",
+        "destination": "/product-detail.html"
+      },
+      {
+        "source": "/checkout.html",
+        "destination": "/checkout.html"
+      },
+      {
+        "source": "/order-success.html",
+        "destination": "/order-success.html"
+      },
+      {
+        "source": "/user-login.html",
+        "destination": "/user-login.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "/(.*)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=3600"
+          }
+        ]
+      }
+    ]
+  }
