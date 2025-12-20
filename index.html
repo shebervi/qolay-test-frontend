@@ -249,38 +249,168 @@
     </div>
   </div>
 
+  <!-- Экран выбора гостей (показывается при наличии параметра table) -->
+  <div id="guests-screen" class="page-container" style="display: none;">
+    <div class="guests-screen">
+      <div class="guests-container">
+        <h1 class="guests-title">Сколько гостей?</h1>
+        
+        <div class="guests-selector">
+          <button id="decrease-guests" class="quantity-btn">−</button>
+          <div class="quantity-display" id="guests-display">1</div>
+          <button id="increase-guests" class="quantity-btn">+</button>
+        </div>
+        
+        <input 
+          type="number" 
+          id="guests-input" 
+          class="input" 
+          min="1" 
+          max="20" 
+          value="1"
+          style="max-width: 200px; margin: 0 auto 24px; text-align: center;"
+        />
+        
+        <button id="continue-btn" class="btn btn-primary" style="width: 100%;">
+          Продолжить
+        </button>
+        
+        <div id="loading" class="loading">
+          <div class="spinner"></div>
+          <p>Создание корзины...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/api.js"></script>
   <script>
-    // Автоматический редирект при наличии QR токена
+    // Проверка наличия QR токена
     const urlParams = new URLSearchParams(window.location.search);
     const tableToken = urlParams.get('table');
     
     if (tableToken) {
-      window.location.href = `guests.html?table=${tableToken}`;
-    }
-    
-    // Проверка наличия логотипа
-    const logoImg = document.getElementById('landing-logo');
-    if (logoImg) {
-      logoImg.onload = function() {
-        this.style.display = 'block';
-        document.getElementById('logo-placeholder').style.display = 'none';
+      // Показываем экран выбора гостей вместо лендинга
+      document.querySelector('.landing').style.display = 'none';
+      document.getElementById('guests-screen').style.display = 'block';
+      
+      // Инициализация экрана выбора гостей
+      function initGuestsScreen() {
+        // Элементы DOM
+        const guestsInput = document.getElementById('guests-input');
+        const guestsDisplay = document.getElementById('guests-display');
+        const decreaseBtn = document.getElementById('decrease-guests');
+        const increaseBtn = document.getElementById('increase-guests');
+        const continueBtn = document.getElementById('continue-btn');
+        const loadingIndicator = document.getElementById('loading');
+
+        let selectedGuests = 1;
+        const minGuests = 1;
+        const maxGuests = 20;
+
+        // Обновить отображение количества гостей
+        function updateGuestsDisplay() {
+          guestsDisplay.textContent = selectedGuests;
+          guestsInput.value = selectedGuests;
+          
+          // Обновить состояние кнопок
+          decreaseBtn.disabled = selectedGuests <= minGuests;
+          increaseBtn.disabled = selectedGuests >= maxGuests;
+        }
+
+        // Уменьшить количество гостей
+        decreaseBtn.addEventListener('click', () => {
+          if (selectedGuests > minGuests) {
+            selectedGuests--;
+            updateGuestsDisplay();
+          }
+        });
+
+        // Увеличить количество гостей
+        increaseBtn.addEventListener('click', () => {
+          if (selectedGuests < maxGuests) {
+            selectedGuests++;
+            updateGuestsDisplay();
+          }
+        });
+
+        // Прямой ввод в поле
+        guestsInput.addEventListener('change', (e) => {
+          const value = parseInt(e.target.value, 10);
+          if (!isNaN(value) && value >= minGuests && value <= maxGuests) {
+            selectedGuests = value;
+            updateGuestsDisplay();
+          } else {
+            // Вернуть предыдущее значение если невалидное
+            updateGuestsDisplay();
+          }
+        });
+
+        // Обработка кнопки "Продолжить"
+        continueBtn.addEventListener('click', async () => {
+          try {
+            // Показать индикатор загрузки
+            loadingIndicator.style.display = 'block';
+            continueBtn.disabled = true;
+
+            // Создать корзину
+            const cartResult = await API.createCart(tableToken);
+            const sessionId = cartResult.sessionId;
+
+            // Установить количество гостей
+            await API.setGuests(sessionId, selectedGuests);
+
+            // Сохранить сессию и количество гостей в localStorage
+            Utils.saveSession(sessionId, tableToken);
+            localStorage.setItem('guests_count', selectedGuests.toString());
+
+            // Перейти на экран меню
+            Utils.navigateToMenu();
+          } catch (error) {
+            Utils.showError(error.message || 'Не удалось создать корзину. Попробуйте еще раз.');
+            loadingIndicator.style.display = 'none';
+            continueBtn.disabled = false;
+          }
+        });
+
+        // Инициализация
+        updateGuestsDisplay();
+      }
+      
+      // Запустить инициализацию когда DOM готов
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initGuestsScreen);
+      } else {
+        initGuestsScreen();
+      }
+    } else {
+      // Показываем лендинг, если нет параметра table
+      // Проверка наличия логотипа
+      const logoImg = document.getElementById('landing-logo');
+      if (logoImg) {
+        logoImg.onload = function() {
+          this.style.display = 'block';
+          document.getElementById('logo-placeholder').style.display = 'none';
+        };
+        logoImg.onerror = function() {
+          this.style.display = 'none';
+          document.getElementById('logo-placeholder').style.display = 'flex';
+        };
+      }
+      
+      // Проверка наличия фонового изображения ресторана
+      const landingElement = document.querySelector('.landing');
+      const bgImage = new Image();
+      bgImage.src = 'images/restaurant-bg.jpg';
+      bgImage.onload = function() {
+        landingElement.classList.add('has-bg-image');
       };
-      logoImg.onerror = function() {
-        this.style.display = 'none';
-        document.getElementById('logo-placeholder').style.display = 'flex';
+      bgImage.onerror = function() {
+        // Изображение не найдено, используем только градиент
       };
     }
-    
-    // Проверка наличия фонового изображения ресторана
-    const landingElement = document.querySelector('.landing');
-    const bgImage = new Image();
-    bgImage.src = 'images/restaurant-bg.jpg';
-    bgImage.onload = function() {
-      landingElement.classList.add('has-bg-image');
-    };
-    bgImage.onerror = function() {
-      // Изображение не найдено, используем только градиент
-    };
   </script>
 </body>
 </html>

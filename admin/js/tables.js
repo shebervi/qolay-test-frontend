@@ -300,10 +300,10 @@ function openQRLink() {
   }
   
   // Формируем URL для меню стола
-  // URL имеет формат: /guests.html?table={qrTokenHash}
-  // Используем тот же origin, что и текущая страница, но заменяем путь
+  // URL имеет формат: /?table={qrTokenHash}
+  // Используем тот же origin, что и текущая страница
   const currentOrigin = window.location.origin;
-  const qrUrl = `${currentOrigin}/guests.html?table=${currentQRTokenHash}`;
+  const qrUrl = `${currentOrigin}/?table=${currentQRTokenHash}`;
   
   // Открываем в новой вкладке
   window.open(qrUrl, '_blank');
