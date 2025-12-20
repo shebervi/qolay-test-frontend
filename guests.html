@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Выбор количества гостей - QolayKZ</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div class="page-container">
+    <div class="guests-screen">
+      <div class="guests-container">
+        <h1 class="guests-title">Сколько гостей?</h1>
+        
+        <div class="guests-selector">
+          <button id="decrease-guests" class="quantity-btn">−</button>
+          <div class="quantity-display" id="guests-display">1</div>
+          <button id="increase-guests" class="quantity-btn">+</button>
+        </div>
+        
+        <input 
+          type="number" 
+          id="guests-input" 
+          class="input" 
+          min="1" 
+          max="20" 
+          value="1"
+          style="max-width: 200px; margin: 0 auto 24px; text-align: center;"
+        />
+        
+        <button id="continue-btn" class="btn btn-primary" style="width: 100%;">
+          Продолжить
+        </button>
+        
+        <div id="loading" class="loading">
+          <div class="spinner"></div>
+          <p>Создание корзины...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/guests.js"></script>
+</body>
+</html>
+

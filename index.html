@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Qolay - Цифровое меню для ресторанов</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .landing {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px;
+      text-align: center;
+      background: linear-gradient(135deg, #ff6b35 0%, #f7931e 50%, #ff8c42 100%);
+      color: white;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    /* Фоновое изображение ресторана (если добавлено) */
+    .landing::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-image: url('images/restaurant-bg.jpg');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      opacity: 0;
+      transition: opacity 0.5s ease-in-out;
+      z-index: 0;
+    }
+    
+    /* Показываем изображение, если оно загрузилось */
+    .landing.has-bg-image::after {
+      opacity: 0.3;
+    }
+    
+    /* Overlay для контраста текста поверх изображения - темнее */
+    .landing.has-bg-image::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(135deg, rgba(52, 16, 2, 0.82) 0%, rgba(106, 62, 11, 0.418) 50%, rgba(24, 9, 0, 0.345) 100%),
+                  radial-gradient(circle at center, rgba(0, 0, 0, 0.15) 0%, transparent 70%);
+      z-index: 0;
+      pointer-events: none;
+    }
+    
+    /* Дополнительные радиальные эффекты - более темные */
+    .landing::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.08) 0%, transparent 50%),
+                  radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.05) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 1;
+    }
+    
+    .landing-content {
+      position: relative;
+      z-index: 2;
+      max-width: 600px;
+      width: 100%;
+    }
+    
+    .landing-logo-container {
+      margin-bottom: 32px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .landing-logo {
+      width: 120px;
+      height: 120px;
+      object-fit: contain;
+      filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.2));
+      animation: fadeInUp 0.8s ease-out;
+    }
+    
+    .landing-logo-placeholder {
+      width: 120px;
+      height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 64px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 24px;
+      backdrop-filter: blur(10px);
+      animation: fadeInUp 0.8s ease-out;
+    }
+    
+    .landing-title {
+      font-size: 56px;
+      font-weight: 800;
+      margin-bottom: 16px;
+      letter-spacing: -0.02em;
+      animation: fadeInUp 0.8s ease-out 0.2s both;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    .landing-subtitle {
+      font-size: 22px;
+      margin-bottom: 48px;
+      opacity: 0.95;
+      line-height: 1.6;
+      font-weight: 400;
+      animation: fadeInUp 0.8s ease-out 0.4s both;
+    }
+    
+    .landing-actions {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+      animation: fadeInUp 0.8s ease-out 0.6s both;
+    }
+    
+    .landing-btn {
+      padding: 18px 36px;
+      border: none;
+      border-radius: 16px;
+      font-size: 18px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-width: 220px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    .landing-btn-primary {
+      background-color: white;
+      color: #ff6b35;
+    }
+    
+    .landing-btn-primary:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+      background-color: #f8f9fa;
+    }
+    
+    .landing-btn-secondary {
+      background-color: rgba(255, 255, 255, 0.15);
+      color: white;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      backdrop-filter: blur(10px);
+    }
+    
+    .landing-btn-secondary:hover {
+      background-color: rgba(255, 255, 255, 0.25);
+      border-color: rgba(255, 255, 255, 0.5);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    }
+    
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    @media (max-width: 768px) {
+      .landing {
+        padding: 24px 16px;
+      }
+      
+      .landing-logo,
+      .landing-logo-placeholder {
+        width: 100px;
+        height: 100px;
+      }
+      
+      .landing-logo-placeholder {
+        font-size: 56px;
+      }
+      
+      .landing-title {
+        font-size: 40px;
+      }
+      
+      .landing-subtitle {
+        font-size: 18px;
+        margin-bottom: 40px;
+      }
+      
+      .landing-actions {
+        flex-direction: column;
+        width: 100%;
+        max-width: 100%;
+      }
+      
+      .landing-btn {
+        width: 100%;
+        min-width: auto;
+        padding: 16px 24px;
+        font-size: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="landing">
+    <div class="landing-content">
+      <div class="landing-logo-container">
+        <img id="landing-logo" class="landing-logo" src="images/logo.png" alt="Qolay Logo" style="display: none;" onerror="this.style.display='none'; document.getElementById('logo-placeholder').style.display='flex';">
+        <div id="logo-placeholder" class="landing-logo-placeholder">
+          <i class="fas fa-utensils"></i>
+        </div>
+      </div>
+      <h1 class="landing-title">Qolay</h1>
+      <p class="landing-subtitle">Современное цифровое меню для ресторанов</p>
+      
+      <div class="landing-actions">
+        <a href="restaurants.html" class="landing-btn landing-btn-primary">
+          <i class="fas fa-building"></i>
+          Просмотреть рестораны
+        </a>
+        <a href="admin/login.html" class="landing-btn landing-btn-secondary">
+          <i class="fas fa-cog"></i>
+          Панель управления
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Автоматический редирект при наличии QR токена
+    const urlParams = new URLSearchParams(window.location.search);
+    const tableToken = urlParams.get('table');
+    
+    if (tableToken) {
+      window.location.href = `guests.html?table=${tableToken}`;
+    }
+    
+    // Проверка наличия логотипа
+    const logoImg = document.getElementById('landing-logo');
+    if (logoImg) {
+      logoImg.onload = function() {
+        this.style.display = 'block';
+        document.getElementById('logo-placeholder').style.display = 'none';
+      };
+      logoImg.onerror = function() {
+        this.style.display = 'none';
+        document.getElementById('logo-placeholder').style.display = 'flex';
+      };
+    }
+    
+    // Проверка наличия фонового изображения ресторана
+    const landingElement = document.querySelector('.landing');
+    const bgImage = new Image();
+    bgImage.src = 'images/restaurant-bg.jpg';
+    bgImage.onload = function() {
+      landingElement.classList.add('has-bg-image');
+    };
+    bgImage.onerror = function() {
+      // Изображение не найдено, используем только градиент
+    };
+  </script>
+</body>
+</html>
+

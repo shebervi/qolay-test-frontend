@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Заказ оформлен - QolayKZ</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div class="page-container">
+    <header class="header">
+      <div class="header-content">
+        <div class="header-title">Заказ оформлен</div>
+      </div>
+    </header>
+
+    <div class="container" style="padding: 16px; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+      <div id="loading" class="loading" style="display: none;">
+        <div class="spinner"></div>
+        <p>Загрузка информации о заказе...</p>
+      </div>
+
+      <div id="success-content" style="display: none; text-align: center; max-width: 600px; width: 100%;">
+        <div style="font-size: 64px; margin-bottom: 24px;">✅</div>
+        <h1 style="margin-bottom: 16px; color: #27ae60;">Заказ успешно оформлен!</h1>
+        
+        <div id="order-info" style="background: #f9f9f9; padding: 24px; border-radius: 12px; margin: 24px 0; text-align: left; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+          <!-- Информация о заказе будет добавлена через JS -->
+        </div>
+
+        <p style="color: #666; margin-bottom: 24px;">
+          Ваш заказ принят в обработку. Официант скоро подойдет к вашему столу.
+        </p>
+
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <button onclick="window.location.href='menu.html'" class="btn btn-primary" style="width: 100%;">
+            Продолжить заказ
+          </button>
+          <button onclick="window.location.href='cart.html'" class="btn btn-secondary" style="width: 100%;">
+            Посмотреть корзину
+          </button>
+        </div>
+        
+        <p style="color: #999; font-size: 14px; margin-top: 24px; text-align: center;">
+          Вы можете продолжить добавлять товары в корзину и оформить еще один заказ
+        </p>
+      </div>
+
+      <div id="error-content" style="display: none; text-align: center;">
+        <div style="font-size: 48px; margin-bottom: 16px;">❌</div>
+        <h2 style="margin-bottom: 16px; color: #e74c3c;">Ошибка</h2>
+        <p id="error-message" style="color: #666; margin-bottom: 24px;"></p>
+        <button onclick="window.location.href='cart.html'" class="btn btn-primary">
+          Вернуться в корзину
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/api.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const orderId = urlParams.get('order');
+
+      const loadingIndicator = document.getElementById('loading');
+      const successContent = document.getElementById('success-content');
+      const errorContent = document.getElementById('error-content');
+      const errorMessage = document.getElementById('error-message');
+      const orderInfo = document.getElementById('order-info');
+
+      if (!orderId) {
+        loadingIndicator.style.display = 'none';
+        errorContent.style.display = 'block';
+        errorMessage.textContent = 'ID заказа не указан';
+        return;
+      }
+
+      try {
+        loadingIndicator.style.display = 'block';
+        const order = await API.getOrder(orderId);
+        loadingIndicator.style.display = 'none';
+
+        // Отобразить информацию о заказе
+        const statusLabels = {
+          'DRAFT': 'Черновик',
+          'PAYMENT_PENDING': 'Ожидает оплаты',
+          'PAID': 'Оплачен',
+          'ACCEPTED': 'Принят',
+          'COOKING': 'Готовится',
+          'READY': 'Готов',
+          'SERVED': 'Подано',
+          'CLOSED': 'Закрыт',
+          'CANCELED': 'Отменен',
+          'REFUNDED': 'Возвращен',
+        };
+
+        const statusLabel = statusLabels[order.status] || order.status;
+        const total = parseFloat(order.total_kzt || 0);
+        
+        const paymentMethodLabels = {
+          'CASH': 'Наличные',
+          'CARD': 'Картой банка',
+          'KASPI': 'Kaspi.kz',
+          'APPLE_PAY': 'Apple Pay',
+        };
+        const paymentMethodLabel = paymentMethodLabels[order.payment_method] || order.payment_method || 'Не указано';
+
+        // Формируем список позиций
+        const itemsHtml = order.items && order.items.length > 0 ? order.items.map(item => {
+          const itemName = item.snapshot_name_ru || item.snapshot_name_kk || item.snapshot_name_en || 'Товар';
+          const unitPrice = parseFloat(item.unit_price_kzt || 0);
+          const quantity = item.qty || 1;
+          const lineTotal = parseFloat(item.line_total_kzt || 0);
+          
+          // Модификаторы
+          let modifiersHtml = '';
+          if (item.modifiers && item.modifiers.length > 0) {
+            const modifiersList = item.modifiers.map(mod => {
+              const modName = mod.snapshot_name_ru || mod.snapshot_name_kk || mod.snapshot_name_en || '';
+              const priceDelta = parseFloat(mod.price_delta_kzt || 0);
+              return modName + (priceDelta > 0 ? ` (+${Utils.formatPrice(priceDelta)} ₸)` : '');
+            }).join(', ');
+            
+            modifiersHtml = `
+              <div style="font-size: 13px; color: #666; margin-top: 4px; margin-left: 16px;">
+                ${modifiersList}
+              </div>
+            `;
+          }
+
+          return `
+            <div style="padding: 12px 0; border-bottom: 1px solid #eee;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div style="flex: 1;">
+                  <div style="font-weight: 500; margin-bottom: 4px;">
+                    ${Utils.escapeHtml(itemName)}
+                  </div>
+                  ${modifiersHtml}
+                  <div style="font-size: 13px; color: #666; margin-top: 4px;">
+                    ${Utils.formatPrice(unitPrice)} ₸ × ${quantity}
+                  </div>
+                </div>
+                <div style="font-weight: 600; margin-left: 16px; white-space: nowrap;">
+                  ${Utils.formatPrice(lineTotal)} ₸
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('') : '<p style="color: #999; text-align: center; padding: 16px;">Позиции не найдены</p>';
+
+        orderInfo.innerHTML = `
+          <div style="margin-bottom: 20px; font-size: 32px; font-weight: bold; color: var(--primary-color); text-align: center;">
+            Заказ №${order.order_number}
+          </div>
+          
+          <div style="margin-bottom: 12px;">
+            <strong>Ресторан:</strong> ${Utils.escapeHtml(order.restaurant?.name || 'Не указан')}
+          </div>
+          <div style="margin-bottom: 12px;">
+            <strong>Имя гостя:</strong> ${Utils.escapeHtml(order.guest_name || 'Не указано')}
+          </div>
+          <div style="margin-bottom: 12px;">
+            <strong>Стол:</strong> №${order.table?.number || 'Не указан'}
+          </div>
+          <div style="margin-bottom: 12px;">
+            <strong>Способ оплаты:</strong> ${paymentMethodLabel}
+          </div>
+          <div style="margin-bottom: 12px;">
+            <strong>Статус:</strong> ${statusLabel}
+          </div>
+          
+          <div style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #ddd;">
+            <h3 style="margin-bottom: 12px; font-size: 18px; font-weight: 600;">Позиции заказа:</h3>
+            <div style="max-height: 400px; overflow-y: auto;">
+              ${itemsHtml}
+            </div>
+          </div>
+          
+          <div style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #ddd;">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 20px; font-weight: 600;">
+              <span>Итого:</span>
+              <span>${Utils.formatPrice(total)} ₸</span>
+            </div>
+          </div>
+          
+          ${order.note ? `
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
+              <strong>Заметка:</strong> ${Utils.escapeHtml(order.note)}
+            </div>
+          ` : ''}
+        `;
+
+        successContent.style.display = 'block';
+      } catch (error) {
+        loadingIndicator.style.display = 'none';
+        errorContent.style.display = 'block';
+        errorMessage.textContent = 'Не удалось загрузить информацию о заказе: ' + error.message;
+        console.error('Failed to load order:', error);
+      }
+    });
+  </script>
+</body>
+</html>
+

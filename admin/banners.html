@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Баннеры - QolayKZ Admin</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <div class="sidebar-header">
+        <h1>QolayKZ Admin</h1>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="index.html" class="nav-item" data-page="dashboard">
+          <i class="fas fa-chart-line"></i> Главная
+        </a>
+        <a href="owners.html" class="nav-item" data-page="owners">
+          <i class="fas fa-user-tie"></i> Владельцы
+        </a>
+        <a href="restaurants.html" class="nav-item" data-page="restaurants">
+          <i class="fas fa-building"></i> Рестораны
+        </a>
+        <a href="staff.html" class="nav-item" data-page="staff">
+          <i class="fas fa-users"></i> Персонал
+        </a>
+        <a href="tables.html" class="nav-item" data-page="tables">
+          <i class="fas fa-chair"></i> Столы
+        </a>
+        <a href="categories.html" class="nav-item" data-page="categories">
+          <i class="fas fa-folder"></i> Категории
+        </a>
+        <a href="products.html" class="nav-item" data-page="products">
+          <i class="fas fa-utensils"></i> Продукты
+        </a>
+        <a href="banners.html" class="nav-item active" data-page="banners">
+          <i class="fas fa-bullseye"></i> Баннеры
+        </a>
+        <a href="orders.html" class="nav-item" data-page="orders">
+          <i class="fas fa-box"></i> Заказы
+        </a>
+      </nav>
+    </aside>
+
+    <main class="admin-main">
+      <header class="admin-header">
+        <h2>Промо-баннеры</h2>
+        <div class="header-actions">
+          <span id="user-info" style="margin-right: 16px; color: #666;"></span>
+          <select id="restaurant-filter" class="input" style="max-width: 200px; margin-right: 12px;">
+            <option value="">Все рестораны</option>
+          </select>
+          <select id="status-filter" class="input" style="max-width: 150px; margin-right: 12px;">
+            <option value="">Все статусы</option>
+            <option value="active">Активные</option>
+            <option value="inactive">Неактивные</option>
+          </select>
+          <button class="btn btn-primary" onclick="openBannerModal()">
+            + Добавить баннер
+          </button>
+        </div>
+      </header>
+
+      <div class="admin-content">
+        <div class="list-container" id="banners-list">
+          <div class="loading">Загрузка...</div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal для создания/редактирования баннера -->
+  <div id="banner-modal" class="modal">
+    <div class="modal-content" style="max-width: 800px;">
+      <div class="modal-header">
+        <h3 id="banner-modal-title">Добавить баннер</h3>
+        <button class="modal-close" onclick="closeBannerModal()">&times;</button>
+      </div>
+      <form id="banner-form" class="admin-form">
+        <input type="hidden" id="banner-id">
+        
+        <div class="form-group">
+          <label for="banner-restaurant">Ресторан (оставьте пустым для глобального баннера)</label>
+          <select id="banner-restaurant">
+            <option value="">Глобальный баннер (для всех ресторанов)</option>
+          </select>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
+          <div class="form-group">
+            <label for="banner-title-ru">Заголовок (RU)</label>
+            <input type="text" id="banner-title-ru">
+          </div>
+          <div class="form-group">
+            <label for="banner-title-kk">Заголовок (KK)</label>
+            <input type="text" id="banner-title-kk">
+          </div>
+          <div class="form-group">
+            <label for="banner-title-en">Заголовок (EN)</label>
+            <input type="text" id="banner-title-en">
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
+          <div class="form-group">
+            <label for="banner-subtitle-ru">Подзаголовок (RU)</label>
+            <input type="text" id="banner-subtitle-ru">
+          </div>
+          <div class="form-group">
+            <label for="banner-subtitle-kk">Подзаголовок (KK)</label>
+            <input type="text" id="banner-subtitle-kk">
+          </div>
+          <div class="form-group">
+            <label for="banner-subtitle-en">Подзаголовок (EN)</label>
+            <input type="text" id="banner-subtitle-en">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="banner-image">Изображение баннера <span style="color: #999; font-size: 12px;">(обязательно при создании)</span></label>
+          <input type="file" id="banner-image" accept="image/*">
+          <div id="banner-image-preview" style="margin-top: 12px; display: none;">
+            <img id="banner-image-preview-img" src="" alt="Предпросмотр" style="max-width: 300px; max-height: 200px; border-radius: 8px; border: 1px solid #ddd; object-fit: cover;">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="banner-action-type">Тип действия</label>
+          <select id="banner-action-type" required>
+            <option value="NONE">Без действия</option>
+            <option value="CATEGORY">Переход на категорию</option>
+            <option value="PRODUCT">Переход на продукт</option>
+            <option value="URL">Переход на URL</option>
+          </select>
+        </div>
+
+        <div id="banner-action-category" class="form-group" style="display: none;">
+          <label for="banner-target-category">Категория</label>
+          <select id="banner-target-category">
+            <option value="">Выберите категорию</option>
+          </select>
+        </div>
+
+        <div id="banner-action-product" class="form-group" style="display: none;">
+          <label for="banner-target-product">Продукт</label>
+          <select id="banner-target-product">
+            <option value="">Выберите продукт</option>
+          </select>
+        </div>
+
+        <div id="banner-action-url" class="form-group" style="display: none;">
+          <label for="banner-target-url">URL</label>
+          <input type="url" id="banner-target-url" placeholder="https://example.com">
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div class="form-group">
+            <label for="banner-starts-at">Начало показа (необязательно)</label>
+            <input type="datetime-local" id="banner-starts-at">
+          </div>
+          <div class="form-group">
+            <label for="banner-ends-at">Конец показа (необязательно)</label>
+            <input type="datetime-local" id="banner-ends-at">
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div class="form-group">
+            <label for="banner-priority">Приоритет (меньше = выше)</label>
+            <input type="number" id="banner-priority" value="100" min="0" max="1000">
+          </div>
+          <div class="form-group">
+            <label for="banner-is-active">Активен</label>
+            <select id="banner-is-active">
+              <option value="true">Да</option>
+              <option value="false">Нет</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeBannerModal()">Отмена</button>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="../config.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="js/admin-auth.js"></script>
+  <script src="js/admin-api.js"></script>
+  <script src="js/banners.js"></script>
+</body>
+</html>
+

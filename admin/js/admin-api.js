@@ -1,0 +1,596 @@
+/**
+ * API клиент для админ панели
+ * 
+ * Зачем:
+ * - Отдельные методы для админских операций
+ * - Упрощение работы с API
+ */
+
+/**
+ * Рестораны
+ */
+async function adminGetRestaurants() {
+  return apiRequest('/admin/restaurants');
+}
+
+async function adminGetRestaurant(id) {
+  return apiRequest(`/admin/restaurants/${id}`);
+}
+
+async function adminCreateRestaurant(data) {
+  return apiRequest('/admin/restaurants', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+async function adminUpdateRestaurant(id, data) {
+  return apiRequest(`/admin/restaurants/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+async function adminUploadRestaurantLogo(id, file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  const headers = {};
+  const token = Auth?.getAuthToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  return fetch(`${CONFIG.API_BASE_URL}/admin/restaurants/${id}/logo`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  }).then(async (response) => {
+    if (response.status === 401) {
+      if (typeof Auth !== 'undefined') {
+        Auth.clearAuth();
+        Auth.redirectToLogin();
+      }
+      throw new Error('Сессия истекла. Пожалуйста, войдите снова.');
+    }
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Failed to upload logo' }));
+      throw new Error(error.message || 'Failed to upload logo');
+    }
+    return response.json();
+  });
+}
+
+async function adminDeleteRestaurant(id) {
+  return apiRequest(`/admin/restaurants/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Столы
+ */
+async function adminGetTables(restaurantId) {
+  const url = restaurantId 
+    ? `/admin/tables?restaurantId=${restaurantId}`
+    : '/admin/tables';
+  return apiRequest(url);
+}
+
+async function adminGetTable(id) {
+  return apiRequest(`/admin/tables/${id}`);
+}
+
+async function adminCreateTable(data) {
+  return apiRequest('/admin/tables', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+async function adminUpdateTable(id, data) {
+  return apiRequest(`/admin/tables/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+async function adminDeleteTable(id) {
+  return apiRequest(`/admin/tables/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+async function adminDownloadQR(id) {
+  const headers = {};
+  const token = Auth?.getAuthToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  const response = await fetch(`${CONFIG.API_BASE_URL}/admin/tables/${id}/qr`, {
+    headers,
+  });
+  
+  if (response.status === 401) {
+    if (typeof Auth !== 'undefined') {
+      Auth.clearAuth();
+      Auth.redirectToLogin();
+    }
+    throw new Error('Сессия истекла. Пожалуйста, войдите снова.');
+  }
+  
+  if (!response.ok) {
+    throw new Error('Failed to download QR code');
+  }
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `table-${id}-qr.png`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
+}
+
+async function adminRotateQRToken(id) {
+  return apiRequest(`/admin/tables/${id}/rotate-token`, {
+    method: 'POST',
+    body: JSON.stringify({}), // Пустое тело для POST без данных
+  });
+}
+
+async function adminUpdateTableStatus(id, status) {
+  return apiRequest(`/admin/tables/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
+
+/**
+ * Категории
+ */
+async function adminGetCategories(restaurantId) {
+  // Используем максимальный limit (100) согласно валидации
+  const url = restaurantId 
+    ? `/categories?restaurantId=${restaurantId}&page=1&limit=100`
+    : '/categories?page=1&limit=100';
+  const response = await apiRequest(url);
+  return response;
+}
+
+async function adminGetCategory(id) {
+  return apiRequest(`/categories/${id}`);
+}
+
+async function adminCreateCategory(data) {
+  return apiRequest('/categories', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+async function adminUpdateCategory(id, data) {
+  return apiRequest(`/categories/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+async function adminDeleteCategory(id) {
+  return apiRequest(`/categories/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Продукты
+ */
+async function adminGetProducts(restaurantId, categoryId) {
+  // Используем максимальный limit (100) согласно валидации
+  let url = '/products?page=1&limit=100';
+  const params = [];
+  if (restaurantId) params.push(`restaurantId=${restaurantId}`);
+  if (categoryId) params.push(`categoryId=${categoryId}`);
+  if (params.length > 0) url += '&' + params.join('&');
+  const response = await apiRequest(url);
+  return response;
+}
+
+async function adminGetProduct(id) {
+  return apiRequest(`/products/${id}`);
+}
+
+async function adminCreateProduct(data) {
+  return apiRequest('/products', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+async function adminUpdateProduct(id, data) {
+  return apiRequest(`/products/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+async function adminDeleteProduct(id) {
+  return apiRequest(`/products/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+async function adminDeleteProductImage(productId, imageId) {
+  return apiRequest(`/products/${productId}/images/${imageId}`, {
+    method: 'DELETE',
+  });
+}
+
+async function adminUploadProductImage(id, file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  const headers = {};
+  const token = Auth?.getAuthToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  return fetch(`${CONFIG.API_BASE_URL}/products/${id}/images`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  }).then(async (response) => {
+    if (response.status === 401) {
+      if (typeof Auth !== 'undefined') {
+        Auth.clearAuth();
+        Auth.redirectToLogin();
+      }
+      throw new Error('Сессия истекла. Пожалуйста, войдите снова.');
+    }
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Failed to upload image' }));
+      throw new Error(error.message || 'Failed to upload image');
+    }
+    return response.json();
+  });
+}
+
+/**
+ * Модификаторы
+ */
+async function adminGetModifierGroups(productId) {
+  return apiRequest(`/products/${productId}/modifiers`);
+}
+
+async function adminCreateModifierGroup(productId, data) {
+  return apiRequest(`/products/${productId}/modifiers`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+async function adminUpdateModifierGroup(productId, groupId, data) {
+  return apiRequest(`/products/${productId}/modifiers/${groupId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+async function adminDeleteModifierGroup(productId, groupId) {
+  return apiRequest(`/products/${productId}/modifiers/${groupId}`, {
+    method: 'DELETE',
+  });
+}
+
+async function adminCreateModifierOption(groupId, data) {
+  return apiRequest(`/modifiers/${groupId}/options`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+async function adminUpdateModifierOption(groupId, optionId, data) {
+  return apiRequest(`/modifiers/${groupId}/options/${optionId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+async function adminDeleteModifierOption(groupId, optionId) {
+  return apiRequest(`/modifiers/${groupId}/options/${optionId}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Баннеры
+ */
+async function adminGetBanners(restaurantId, status) {
+  let url = '/admin/banners';
+  const params = [];
+  if (restaurantId) params.push(`restaurantId=${restaurantId}`);
+  if (status === 'active') params.push(`isActive=true`);
+  if (status === 'inactive') params.push(`isActive=false`);
+  if (params.length > 0) url += '?' + params.join('&');
+  return apiRequest(url);
+}
+
+async function adminGetBanner(id) {
+  return apiRequest(`/admin/banners/${id}`);
+}
+
+async function adminCreateBanner(data) {
+  return apiRequest('/admin/banners', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+async function adminUpdateBanner(id, data) {
+  return apiRequest(`/admin/banners/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+async function adminDeleteBanner(id) {
+  return apiRequest(`/admin/banners/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+async function adminUploadBannerImage(id, file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  const headers = {};
+  const token = Auth?.getAuthToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  return fetch(`${CONFIG.API_BASE_URL}/admin/banners/${id}/image`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  }).then(async (response) => {
+    if (response.status === 401) {
+      if (typeof Auth !== 'undefined') {
+        Auth.clearAuth();
+        Auth.redirectToLogin();
+      }
+      throw new Error('Сессия истекла. Пожалуйста, войдите снова.');
+    }
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Failed to upload image' }));
+      throw new Error(error.message || 'Failed to upload image');
+    }
+    return response.json();
+  });
+}
+
+/**
+ * Заказы
+ */
+async function adminGetOrders(filters = {}) {
+  // Пока используем публичный эндпоинт, так как админских нет
+  // В будущем можно добавить /admin/orders
+  let url = '/public/orders';
+  const params = [];
+  
+  if (filters.restaurantId) params.push(`restaurantId=${encodeURIComponent(filters.restaurantId)}`);
+  
+  // Поддержка множественного выбора статусов
+  if (filters.status) {
+    if (Array.isArray(filters.status)) {
+      filters.status.forEach(s => params.push(`status=${encodeURIComponent(s)}`));
+    } else {
+      params.push(`status=${encodeURIComponent(filters.status)}`);
+    }
+  }
+  
+  // Поддержка множественного выбора способов оплаты
+  if (filters.paymentMethod) {
+    if (Array.isArray(filters.paymentMethod)) {
+      filters.paymentMethod.forEach(m => params.push(`paymentMethod=${encodeURIComponent(m)}`));
+    } else {
+      params.push(`paymentMethod=${encodeURIComponent(filters.paymentMethod)}`);
+    }
+  }
+  
+  // Поддержка множественного выбора номеров столов
+  if (filters.tableNumber !== undefined && filters.tableNumber !== '') {
+    if (Array.isArray(filters.tableNumber)) {
+      filters.tableNumber.forEach(t => params.push(`tableNumber=${t}`));
+    } else {
+      params.push(`tableNumber=${filters.tableNumber}`);
+    }
+  }
+  
+  if (filters.minAmount !== undefined && filters.minAmount !== '') params.push(`minAmount=${filters.minAmount}`);
+  if (filters.maxAmount !== undefined && filters.maxAmount !== '') params.push(`maxAmount=${filters.maxAmount}`);
+  if (filters.dateFrom) params.push(`dateFrom=${encodeURIComponent(filters.dateFrom)}`);
+  if (filters.dateTo) params.push(`dateTo=${encodeURIComponent(filters.dateTo)}`);
+  
+  if (params.length > 0) url += '?' + params.join('&');
+  return apiRequest(url);
+}
+
+async function adminGetOrder(id) {
+  return apiRequest(`/public/orders/${id}`);
+}
+
+async function adminUpdateOrderStatus(id, status) {
+  return apiRequest(`/public/orders/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
+
+/**
+ * Владельцы
+ */
+async function adminGetOwners() {
+  return apiRequest('/admin/users/owners');
+}
+
+async function adminCreateOwner(data) {
+  return apiRequest('/admin/users/owner', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+async function adminSetOwnerPassword(ownerId, password) {
+  return apiRequest('/admin/users/owner-password', {
+    method: 'POST',
+    body: JSON.stringify({ ownerId, password }),
+  });
+}
+
+/**
+ * Персонал (Staff)
+ */
+async function adminGetManagers(restaurantId) {
+  const url = restaurantId 
+    ? `/admin/staff/managers?restaurantId=${restaurantId}`
+    : '/admin/staff/managers';
+  return apiRequest(url);
+}
+
+async function adminGetManager(id) {
+  return apiRequest(`/admin/staff/managers/${id}`);
+}
+
+async function adminCreateManager(data) {
+  return apiRequest('/admin/staff/managers', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+async function adminUpdateManager(id, data) {
+  return apiRequest(`/admin/staff/managers/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+async function adminDeleteManager(id) {
+  return apiRequest(`/admin/staff/managers/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+async function adminGetWaiters(restaurantId) {
+  const url = restaurantId 
+    ? `/admin/staff/waiters?restaurantId=${restaurantId}`
+    : '/admin/staff/waiters';
+  return apiRequest(url);
+}
+
+async function adminGetWaiter(id) {
+  return apiRequest(`/admin/staff/waiters/${id}`);
+}
+
+async function adminCreateWaiter(data) {
+  return apiRequest('/admin/staff/waiters', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+async function adminUpdateWaiter(id, data) {
+  return apiRequest(`/admin/staff/waiters/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+async function adminDeleteWaiter(id) {
+  return apiRequest(`/admin/staff/waiters/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+async function adminSetKitchenPassword(restaurantId, password) {
+  return apiRequest('/admin/staff/kitchen/password', {
+    method: 'POST',
+    body: JSON.stringify({ restaurantId, password }),
+  });
+}
+
+// Экспорт функций
+if (typeof window !== 'undefined') {
+  window.AdminAPI = {
+    // Restaurants
+    getRestaurants: adminGetRestaurants,
+    getRestaurant: adminGetRestaurant,
+    createRestaurant: adminCreateRestaurant,
+    updateRestaurant: adminUpdateRestaurant,
+    deleteRestaurant: adminDeleteRestaurant,
+    uploadRestaurantLogo: adminUploadRestaurantLogo,
+    // Tables
+    getTables: adminGetTables,
+    getTable: adminGetTable,
+    createTable: adminCreateTable,
+    updateTable: adminUpdateTable,
+    deleteTable: adminDeleteTable,
+    downloadQR: adminDownloadQR,
+    rotateQRToken: adminRotateQRToken,
+    updateTableStatus: adminUpdateTableStatus,
+    // Categories
+    getCategories: adminGetCategories,
+    getCategory: adminGetCategory,
+    createCategory: adminCreateCategory,
+    updateCategory: adminUpdateCategory,
+    deleteCategory: adminDeleteCategory,
+    // Products
+    getProducts: adminGetProducts,
+    getProduct: adminGetProduct,
+    createProduct: adminCreateProduct,
+    updateProduct: adminUpdateProduct,
+    deleteProduct: adminDeleteProduct,
+    uploadProductImage: adminUploadProductImage,
+    deleteProductImage: adminDeleteProductImage,
+    // Modifiers
+    getModifierGroups: adminGetModifierGroups,
+    createModifierGroup: adminCreateModifierGroup,
+    updateModifierGroup: adminUpdateModifierGroup,
+    deleteModifierGroup: adminDeleteModifierGroup,
+    createModifierOption: adminCreateModifierOption,
+    updateModifierOption: adminUpdateModifierOption,
+    deleteModifierOption: adminDeleteModifierOption,
+    // Banners
+    getBanners: adminGetBanners,
+    getBanner: adminGetBanner,
+    createBanner: adminCreateBanner,
+    updateBanner: adminUpdateBanner,
+    deleteBanner: adminDeleteBanner,
+    uploadBannerImage: adminUploadBannerImage,
+    // Orders
+    getOrders: adminGetOrders,
+    getOrder: adminGetOrder,
+    updateOrderStatus: adminUpdateOrderStatus,
+    // Owners
+    getOwners: adminGetOwners,
+    createOwner: adminCreateOwner,
+    setOwnerPassword: adminSetOwnerPassword,
+    // Staff
+    getManagers: adminGetManagers,
+    getManager: adminGetManager,
+    createManager: adminCreateManager,
+    updateManager: adminUpdateManager,
+    deleteManager: adminDeleteManager,
+    getWaiters: adminGetWaiters,
+    getWaiter: adminGetWaiter,
+    createWaiter: adminCreateWaiter,
+    updateWaiter: adminUpdateWaiter,
+    deleteWaiter: adminDeleteWaiter,
+    setKitchenPassword: adminSetKitchenPassword,
+  };
+}
+

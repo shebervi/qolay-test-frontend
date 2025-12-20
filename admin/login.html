@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Авторизация - QolayKZ Admin</title>
+  <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="css/admin.css">
+  <link rel="stylesheet" href="css/login.css">
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-card">
+      <div class="login-header">
+        <h1>QolayKZ Admin</h1>
+        <p>Войдите в систему управления</p>
+      </div>
+
+      <div class="login-tabs">
+        <button class="login-tab active" data-role="admin">Админ</button>
+        <button class="login-tab" data-role="owner">Владелец</button>
+        <button class="login-tab" data-role="manager">Менеджер</button>
+        <button class="login-tab" data-role="kitchen">Кухня</button>
+        <button class="login-tab" data-role="waiter">Официант</button>
+      </div>
+
+      <!-- Admin Login Form -->
+      <form class="login-form active" id="admin-form" data-role="admin">
+        <div class="form-group">
+          <label>Username <span class="role-badge admin">ADMIN</span></label>
+          <input type="text" id="admin-username" placeholder="Введите username" required>
+          <div class="error-message" id="admin-username-error"></div>
+        </div>
+        <div class="form-group">
+          <label>Пароль</label>
+          <input type="password" id="admin-password" placeholder="Введите пароль" required>
+          <div class="error-message" id="admin-password-error"></div>
+        </div>
+        <button type="submit" class="btn-login">Войти</button>
+      </form>
+
+      <!-- Owner Login Form -->
+      <form class="login-form" id="owner-form" data-role="owner">
+        <div class="form-group">
+          <label>Телефон <span class="role-badge owner">OWNER</span></label>
+          <input type="tel" id="owner-phone" placeholder="+77001234567" required>
+          <div class="error-message" id="owner-phone-error"></div>
+        </div>
+        <div class="form-group">
+          <label>Пароль</label>
+          <input type="password" id="owner-password" placeholder="Введите пароль" required>
+          <div class="error-message" id="owner-password-error"></div>
+        </div>
+        <button type="submit" class="btn-login">Войти</button>
+        <div class="forgot-password">
+          <a href="#" onclick="showPasswordReset('owner'); return false;">Забыли пароль?</a>
+        </div>
+      </form>
+
+      <!-- Manager Login Form -->
+      <form class="login-form" id="manager-form" data-role="manager">
+        <div class="form-group">
+          <label>Телефон <span class="role-badge manager">MANAGER</span></label>
+          <input type="tel" id="manager-phone" placeholder="+77001234567" required>
+          <div class="error-message" id="manager-phone-error"></div>
+        </div>
+        <div class="form-group">
+          <label>Пароль</label>
+          <input type="password" id="manager-password" placeholder="Введите пароль" required>
+          <div class="error-message" id="manager-password-error"></div>
+        </div>
+        <button type="submit" class="btn-login">Войти</button>
+        <div class="forgot-password">
+          <a href="#" onclick="showPasswordReset('manager'); return false;">Забыли пароль?</a>
+        </div>
+      </form>
+
+      <!-- Kitchen Login Form -->
+      <form class="login-form" id="kitchen-form" data-role="kitchen">
+        <div class="form-group">
+          <label>ID Ресторана <span class="role-badge kitchen">KITCHEN</span></label>
+          <input type="text" id="kitchen-restaurant-id" placeholder="UUID ресторана" required>
+          <div class="error-message" id="kitchen-restaurant-id-error"></div>
+        </div>
+        <div class="form-group">
+          <label>Пароль кухни</label>
+          <input type="password" id="kitchen-password" placeholder="Введите пароль кухни" required>
+          <div class="error-message" id="kitchen-password-error"></div>
+        </div>
+        <button type="submit" class="btn-login">Войти</button>
+      </form>
+
+      <!-- Waiter Login Form -->
+      <form class="login-form" id="waiter-form" data-role="waiter">
+        <div class="form-group">
+          <label>Username <span class="role-badge waiter">WAITER</span></label>
+          <input type="text" id="waiter-username" placeholder="Введите username" required>
+          <div class="error-message" id="waiter-username-error"></div>
+        </div>
+        <div class="form-group">
+          <label>Пароль</label>
+          <input type="password" id="waiter-password" placeholder="Введите пароль" required>
+          <div class="error-message" id="waiter-password-error"></div>
+        </div>
+        <button type="submit" class="btn-login">Войти</button>
+      </form>
+
+      <!-- Password Reset Modal (Owner/Manager) -->
+      <div id="password-reset-modal" class="password-reset-modal">
+        <h3>Сброс пароля</h3>
+        <div class="form-group">
+          <label>Телефон</label>
+          <input type="tel" id="reset-phone" placeholder="+77001234567" required>
+        </div>
+        <div class="form-group">
+          <label>OTP код</label>
+          <input type="text" id="reset-otp" placeholder="6-значный код" maxlength="6" required>
+          <button type="button" class="btn btn-secondary btn-otp" onclick="sendResetOtp()">Отправить OTP</button>
+        </div>
+        <div class="form-group">
+          <label>Новый пароль</label>
+          <input type="password" id="reset-new-password" placeholder="Минимум 6 символов" required>
+        </div>
+        <div class="password-reset-actions">
+        <button type="button" class="btn-login" onclick="resetPassword()">Сбросить пароль</button>
+          <button type="button" class="btn btn-secondary" onclick="hidePasswordReset()">Отмена</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="js/admin-login.js"></script>
+</body>
+</html>

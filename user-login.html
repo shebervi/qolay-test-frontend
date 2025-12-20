@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Вход - QolayKZ</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .login-container {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 20px;
+    }
+
+    .login-card {
+      background: white;
+      border-radius: 16px;
+      padding: 40px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .login-header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .login-header h1 {
+      font-size: 28px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #1a1a1a;
+    }
+
+    .login-header p {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #1a1a1a;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: border-color 0.2s;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #4a90e2;
+    }
+
+    .form-group input.error {
+      border-color: var(--error-color);
+    }
+
+    .error-message {
+      color: var(--error-color);
+      font-size: 14px;
+      margin-top: 8px;
+      display: none;
+    }
+
+    .error-message.show {
+      display: block;
+    }
+
+    .success-message {
+      color: var(--success-color);
+      font-size: 14px;
+      margin-top: 8px;
+      display: none;
+    }
+
+    .success-message.show {
+      display: block;
+    }
+
+    .btn-login {
+      width: 100%;
+      padding: 14px;
+      background-color: #1a1a1a;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 8px;
+    }
+
+    .btn-login:hover:not(:disabled) {
+      background-color: #333;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .btn-login:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .btn-send-otp {
+      width: 100%;
+      padding: 14px;
+      background-color: #4a90e2;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 8px;
+    }
+
+    .btn-send-otp:hover:not(:disabled) {
+      background-color: #357abd;
+      transform: translateY(-1px);
+    }
+
+    .btn-send-otp:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .otp-step {
+      display: none;
+    }
+
+    .otp-step.active {
+      display: block;
+    }
+
+    .otp-timer {
+      text-align: center;
+      margin-top: 16px;
+      color: #666;
+      font-size: 14px;
+    }
+
+    .back-link {
+      text-align: center;
+      margin-top: 16px;
+    }
+
+    .back-link a {
+      color: #4a90e2;
+      text-decoration: none;
+      font-size: 14px;
+    }
+
+    .back-link a:hover {
+      text-decoration: underline;
+    }
+
+    .otp-input-group {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+    }
+
+    .otp-input {
+      width: 50px;
+      height: 50px;
+      text-align: center;
+      font-size: 24px;
+      font-weight: 600;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+    }
+
+    .otp-input:focus {
+      outline: none;
+      border-color: #4a90e2;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-card">
+      <div class="login-header">
+        <h1>QolayKZ</h1>
+        <p>Вход для клиентов</p>
+      </div>
+
+      <!-- Step 1: Phone Input -->
+      <div class="otp-step active" id="phone-step">
+        <form id="phone-form">
+          <div class="form-group">
+            <label>Номер телефона</label>
+            <input type="tel" id="user-phone" placeholder="+77001234567" required>
+            <div class="error-message" id="phone-error"></div>
+            <div class="success-message" id="phone-success"></div>
+          </div>
+          <button type="submit" class="btn-send-otp" id="send-otp-btn">Отправить код</button>
+        </form>
+      </div>
+
+      <!-- Step 2: OTP Verification -->
+      <div class="otp-step" id="otp-step">
+        <form id="otp-form">
+          <div class="form-group">
+            <label>Введите код из SMS</label>
+            <div class="otp-input-group">
+              <input type="text" class="otp-input" id="otp-1" maxlength="1" pattern="[0-9]" required>
+              <input type="text" class="otp-input" id="otp-2" maxlength="1" pattern="[0-9]" required>
+              <input type="text" class="otp-input" id="otp-3" maxlength="1" pattern="[0-9]" required>
+              <input type="text" class="otp-input" id="otp-4" maxlength="1" pattern="[0-9]" required>
+              <input type="text" class="otp-input" id="otp-5" maxlength="1" pattern="[0-9]" required>
+              <input type="text" class="otp-input" id="otp-6" maxlength="1" pattern="[0-9]" required>
+            </div>
+            <div class="error-message" id="otp-error"></div>
+          </div>
+          <button type="submit" class="btn-login" id="verify-otp-btn">Войти</button>
+          <div class="otp-timer" id="otp-timer"></div>
+          <div class="back-link">
+            <a href="#" onclick="backToPhoneStep(); return false;">Изменить номер телефона</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/user-login.js"></script>
+</body>
+</html>

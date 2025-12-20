@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Оформление заказа - QolayKZ</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div class="page-container">
+    <header class="header">
+      <div class="header-content">
+        <div class="header-title">Оформление заказа</div>
+        <a href="cart.html" class="btn-secondary" style="text-decoration: none; padding: 8px 16px;">
+          ← Назад
+        </a>
+      </div>
+    </header>
+
+    <div class="container" style="padding: 16px; flex: 1; display: flex; flex-direction: column;">
+      <div id="loading" class="loading" style="display: none;">
+        <div class="spinner"></div>
+        <p>Оформление заказа...</p>
+      </div>
+
+      <div id="checkout-content" style="display: none; flex: 1; flex-direction: column; gap: 24px;">
+        <!-- Информация о заказе -->
+        <div class="checkout-section">
+          <h2 style="margin-bottom: 16px; font-size: 20px;">Информация о заказе</h2>
+          <div id="order-summary">
+            <!-- Будет заполнено через JS -->
+          </div>
+        </div>
+
+        <!-- Форма оформления -->
+        <form id="checkout-form" class="checkout-form">
+          <div class="form-group">
+            <label for="guest-name" class="form-label">
+              Ваше имя <span style="color: #e74c3c;">*</span>
+            </label>
+            <input 
+              type="text" 
+              id="guest-name" 
+              name="guestName" 
+              class="form-input" 
+              placeholder="Введите ваше имя"
+              required
+              minlength="1"
+              maxlength="100"
+            />
+            <small class="form-hint">Имя необходимо для обращения официанта</small>
+          </div>
+
+          <div class="form-group">
+            <label for="payment-method" class="form-label">
+              Способ оплаты <span style="color: #e74c3c;">*</span>
+            </label>
+            <select 
+              id="payment-method" 
+              name="paymentMethod" 
+              class="form-input" 
+              required
+            >
+              <option value="">Выберите способ оплаты</option>
+              <option value="CASH">Наличные</option>
+              <option value="CARD">Картой банка</option>
+              <option value="KASPI">Kaspi.kz</option>
+              <option value="APPLE_PAY">Apple Pay</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="order-note" class="form-label">
+              Заметка к заказу (необязательно)
+            </label>
+            <textarea 
+              id="order-note" 
+              name="note" 
+              class="form-textarea" 
+              placeholder="Например: Без лука, пожалуйста"
+              maxlength="500"
+              rows="3"
+            ></textarea>
+          </div>
+
+          <div class="checkout-total">
+            <div class="summary-row summary-total">
+              <span>Итого к оплате:</span>
+              <span id="checkout-total" class="summary-total-value">0 ₸</span>
+            </div>
+          </div>
+
+          <button type="submit" id="submit-order-btn" class="btn btn-primary" style="width: 100%; margin-top: 16px;">
+            Оформить заказ
+          </button>
+        </form>
+      </div>
+
+      <div id="error-message" class="error-message" style="display: none;">
+        <!-- Сообщения об ошибках -->
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/checkout.js"></script>
+</body>
+</html>
+
