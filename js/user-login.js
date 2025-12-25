@@ -98,6 +98,16 @@ async function sendOtp() {
     // Сохраняем телефон
     currentPhone = phone;
     
+    // Временно показываем OTP код на фронте (только для разработки)
+    if (data.code) {
+      const otpDisplay = document.getElementById('otp-code-display');
+      const otpValue = document.getElementById('otp-code-value');
+      if (otpDisplay && otpValue) {
+        otpValue.textContent = data.code;
+        otpDisplay.style.display = 'block';
+      }
+    }
+    
     // Переходим к шагу ввода OTP
     document.getElementById('phone-step').classList.remove('active');
     document.getElementById('otp-step').classList.add('active');
@@ -163,8 +173,16 @@ async function verifyOtp() {
     
     Auth.saveAuth(data.accessToken, userData);
     
-    // Перенаправляем на главную
-    window.location.href = '/index.html';
+    // Проверяем redirect параметр
+    const urlParams = new URLSearchParams(window.location.search);
+    const redirect = urlParams.get('redirect');
+    
+    // Если есть redirect, перенаправляем туда, иначе на главную
+    if (redirect) {
+      window.location.href = decodeURIComponent(redirect);
+    } else {
+      window.location.href = '/index.html';
+    }
     
   } catch (error) {
     console.error('Verify OTP error:', error);
@@ -228,6 +246,12 @@ function backToPhoneStep() {
   // Очищаем поля OTP
   document.querySelectorAll('.otp-input').forEach(input => input.value = '');
   document.getElementById('otp-error').classList.remove('show');
+  
+  // Скрываем отображение OTP кода
+  const otpDisplay = document.getElementById('otp-code-display');
+  if (otpDisplay) {
+    otpDisplay.style.display = 'none';
+  }
   
   if (otpTimer) {
     clearTimeout(otpTimer);

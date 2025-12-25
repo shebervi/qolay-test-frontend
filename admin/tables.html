@@ -39,6 +39,9 @@
         <a href="banners.html" class="nav-item" data-page="banners">
           <i class="fas fa-bullseye"></i> Баннеры
         </a>
+        <a href="images.html" class="nav-item" data-page="images">
+          <i class="fas fa-images"></i> Изображения
+        </a>
         <a href="orders.html" class="nav-item" data-page="orders">
           <i class="fas fa-box"></i> Заказы
         </a>
@@ -53,6 +56,9 @@
           <select id="restaurant-filter" class="input" style="max-width: 200px; margin-right: 12px;">
             <option value="">Все рестораны</option>
           </select>
+          <button class="btn btn-secondary" onclick="downloadAllQR()" style="margin-right: 8px;">
+            <i class="fas fa-download"></i> Скачать все QR (PDF)
+          </button>
           <button class="btn btn-primary" onclick="openTableModal()">
             + Добавить стол
           </button>
@@ -109,7 +115,14 @@
       </div>
       <div class="qr-actions">
         <button class="btn btn-primary" onclick="openQRLink()">Открыть QR</button>
-        <button class="btn btn-secondary" onclick="downloadQR()">Скачать QR</button>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <select id="qr-format-select" class="input" style="max-width: 120px;">
+            <option value="png">PNG</option>
+            <option value="svg">SVG</option>
+            <option value="pdf">PDF</option>
+          </select>
+          <button class="btn btn-secondary" onclick="downloadQR()">Скачать QR</button>
+        </div>
         <button class="btn btn-secondary" onclick="rotateQRToken()">Обновить QR</button>
         <button class="btn btn-secondary" onclick="closeQRModal()">Закрыть</button>
       </div>

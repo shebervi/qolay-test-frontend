@@ -966,7 +966,7 @@ async function showOrderDetails(orderId) {
             <div class="order-date-time">${dateStr} ${timeStr}</div>
             </div>
           <div class="order-details-header-right">
-            <span class="order-status-badge-new" style="background: ${statusMeta.color};">
+            <span class="order-status-badge-new" id="order-status-badge-${order.id}" style="background: ${statusMeta.color};">
               ${statusMeta.text}
             </span>
             <div class="order-payment-icon"><i class="fas fa-shopping-cart"></i></div>
@@ -1008,8 +1008,11 @@ async function showOrderDetails(orderId) {
 
         <div class="order-details-actions">
           <button class="btn btn-secondary" onclick="closeOrderModal()">Закрыть</button>
-          <button class="btn btn-primary" onclick="markOrderAsPaid('${order.id}')">Заказ оплачен</button>
-                </div>
+          <div style="display: flex; gap: 12px; align-items: center;">
+            ${renderStatusSelect(selectId, order.status)}
+            <button class="btn btn-primary" onclick="updateOrderStatusFromModal('${order.id}', '${selectId}')">Сохранить</button>
+          </div>
+        </div>
       </div>
     `;
   } catch (error) {
@@ -1044,7 +1047,7 @@ function renderStatusSelect(id, currentStatus) {
   }).join('');
 
   return `
-    <select id="${id}" class="input" style="min-width: 180px;">
+    <select id="${id}" class="input" style="min-width: 200px; padding: 10px 12px; font-size: 14px;" data-current-status="${currentStatus}">
       ${options}
     </select>
   `;
@@ -1103,6 +1106,56 @@ async function markOrderAsPaid(orderId) {
 }
 
 /**
+ * Обновить статус заказа из модального окна
+ */
+async function updateOrderStatusFromModal(orderId, selectId) {
+  const select = document.getElementById(selectId);
+  if (!select) {
+    Utils.showError('Не удалось найти селектор статуса');
+    return;
+  }
+
+  const newStatus = select.value;
+  const currentStatus = select.dataset.currentStatus || '';
+
+  if (newStatus === currentStatus) {
+    Utils.showError('Статус не изменился');
+    return;
+  }
+
+  try {
+    // Обновляем визуально статус сразу для лучшего UX
+    const statusBadge = document.getElementById(`order-status-badge-${orderId}`);
+    if (statusBadge) {
+      const newStatusMeta = getStatusMeta(newStatus);
+      statusBadge.textContent = newStatusMeta.text;
+      statusBadge.style.background = newStatusMeta.color;
+    }
+
+    await AdminAPI.updateOrderStatus(orderId, newStatus);
+    Utils.showSuccess('Статус заказа обновлен');
+    
+    // Обновляем текущий статус в select
+    select.dataset.currentStatus = newStatus;
+    
+    // Обновляем список заказов
+    await loadOrders();
+  } catch (error) {
+    console.error('Failed to update order status:', error);
+    Utils.showError('Не удалось обновить статус: ' + (error.message || 'Неизвестная ошибка'));
+    
+    // Восстанавливаем предыдущий статус в случае ошибки
+    const statusBadge = document.getElementById(`order-status-badge-${orderId}`);
+    if (statusBadge) {
+      const oldStatusMeta = getStatusMeta(currentStatus);
+      statusBadge.textContent = oldStatusMeta.text;
+      statusBadge.style.background = oldStatusMeta.color;
+    }
+    select.value = currentStatus;
+  }
+}
+
+/**
  * Переключить состояние товара в заказе
  */
 function toggleOrderItem(orderId, itemId, isChecked) {
@@ -1121,3 +1174,4 @@ window.updateOrderStatusDirect = updateOrderStatusDirect;
 window.closeOrderModal = closeOrderModal;
 window.markOrderAsPaid = markOrderAsPaid;
 window.toggleOrderItem = toggleOrderItem;
+window.updateOrderStatusFromModal = updateOrderStatusFromModal;

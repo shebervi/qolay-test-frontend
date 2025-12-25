@@ -101,14 +101,19 @@ async function adminDeleteTable(id) {
   });
 }
 
-async function adminDownloadQR(id) {
+async function adminDownloadQR(id, format = 'png') {
   const headers = {};
   const token = Auth?.getAuthToken();
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
   
-  const response = await fetch(`${CONFIG.API_BASE_URL}/admin/tables/${id}/qr`, {
+  const validFormats = ['png', 'svg', 'pdf'];
+  const qrFormat = validFormats.includes(format?.toLowerCase()) 
+    ? format.toLowerCase() 
+    : 'png';
+  
+  const response = await fetch(`${CONFIG.API_BASE_URL}/admin/tables/${id}/qr?format=${qrFormat}`, {
     headers,
   });
   
@@ -127,11 +132,54 @@ async function adminDownloadQR(id) {
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `table-${id}-qr.png`;
+  
+  const filenameMap = {
+    png: `table-${id}-qr.png`,
+    svg: `table-${id}-qr.svg`,
+    pdf: `table-${id}-qr.pdf`,
+  };
+  a.download = filenameMap[qrFormat] || `table-${id}-qr.png`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   window.URL.revokeObjectURL(url);
+}
+
+async function adminDownloadAllQR(restaurantId) {
+  const headers = {};
+  const token = Auth?.getAuthToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  const url = restaurantId 
+    ? `${CONFIG.API_BASE_URL}/admin/tables/all/qr-pdf?restaurantId=${restaurantId}`
+    : `${CONFIG.API_BASE_URL}/admin/tables/all/qr-pdf`;
+  
+  const response = await fetch(url, {
+    headers,
+  });
+  
+  if (response.status === 401) {
+    if (typeof Auth !== 'undefined') {
+      Auth.clearAuth();
+      Auth.redirectToLogin();
+    }
+    throw new Error('Сессия истекла. Пожалуйста, войдите снова.');
+  }
+  
+  if (!response.ok) {
+    throw new Error('Failed to download all QR codes');
+  }
+  const blob = await response.blob();
+  const urlObj = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = urlObj;
+  a.download = 'all-tables-qr.pdf';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(urlObj);
 }
 
 async function adminRotateQRToken(id) {
@@ -202,11 +250,59 @@ async function adminGetProduct(id) {
   return apiRequest(`/products/${id}`);
 }
 
-async function adminCreateProduct(data) {
-  return apiRequest('/products', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
+async function adminCreateProduct(data, imageFiles = []) {
+  // Если есть файлы, используем FormData
+  if (imageFiles && imageFiles.length > 0) {
+    const formData = new FormData();
+    
+    // Добавляем все поля данных
+    Object.keys(data).forEach(key => {
+      if (data[key] !== undefined && data[key] !== null) {
+        if (key === 'composition' && Array.isArray(data[key])) {
+          // composition отправляем как JSON строку
+          formData.append(key, JSON.stringify(data[key]));
+        } else {
+          formData.append(key, data[key]);
+        }
+      }
+    });
+    
+    // Добавляем файлы
+    imageFiles.forEach((file, index) => {
+      formData.append('images', file);
+    });
+    
+    const headers = {};
+    const token = Auth?.getAuthToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    return fetch(`${CONFIG.API_BASE_URL}/products`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    }).then(async (response) => {
+      if (response.status === 401) {
+        if (typeof Auth !== 'undefined') {
+          Auth.clearAuth();
+          Auth.redirectToLogin();
+        }
+        throw new Error('Сессия истекла. Пожалуйста, войдите снова.');
+      }
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Failed to create product' }));
+        throw new Error(error.message || 'Failed to create product');
+      }
+      return response.json();
+    });
+  } else {
+    // Если нет файлов, используем обычный JSON запрос
+    return apiRequest('/products', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
 }
 
 async function adminUpdateProduct(id, data) {
@@ -523,6 +619,51 @@ async function adminSetKitchenPassword(restaurantId, password) {
   });
 }
 
+/**
+ * Изображения продуктов
+ */
+async function adminGetAllImages(restaurantId) {
+  const url = restaurantId 
+    ? `/products/images/all?restaurantId=${restaurantId}`
+    : '/products/images/all';
+  return apiRequest(url);
+}
+
+/**
+ * Отзывы
+ */
+async function adminGetReviews(filters = {}) {
+  let url = '/reviews';
+  const params = [];
+  
+  if (filters.productId) params.push(`productId=${encodeURIComponent(filters.productId)}`);
+  if (filters.orderId) params.push(`orderId=${encodeURIComponent(filters.orderId)}`);
+  if (filters.accountId) params.push(`accountId=${encodeURIComponent(filters.accountId)}`);
+  if (filters.restaurantId) params.push(`restaurantId=${encodeURIComponent(filters.restaurantId)}`);
+  
+  if (filters.status) {
+    if (Array.isArray(filters.status)) {
+      filters.status.forEach(s => params.push(`status=${encodeURIComponent(s)}`));
+    } else {
+      params.push(`status=${encodeURIComponent(filters.status)}`);
+    }
+  }
+  
+  if (params.length > 0) url += '?' + params.join('&');
+  return apiRequest(url);
+}
+
+async function adminGetReview(id) {
+  return apiRequest(`/reviews/${id}`);
+}
+
+async function adminModerateReview(id, status, moderationComment) {
+  return apiRequest(`/reviews/${id}/moderate`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status, moderation_comment: moderationComment }),
+  });
+}
+
 // Экспорт функций
 if (typeof window !== 'undefined') {
   window.AdminAPI = {
@@ -540,6 +681,7 @@ if (typeof window !== 'undefined') {
     updateTable: adminUpdateTable,
     deleteTable: adminDeleteTable,
     downloadQR: adminDownloadQR,
+    downloadAllQR: adminDownloadAllQR,
     rotateQRToken: adminRotateQRToken,
     updateTableStatus: adminUpdateTableStatus,
     // Categories
@@ -591,6 +733,12 @@ if (typeof window !== 'undefined') {
     updateWaiter: adminUpdateWaiter,
     deleteWaiter: adminDeleteWaiter,
     setKitchenPassword: adminSetKitchenPassword,
+    // Images
+    getAllImages: adminGetAllImages,
+    // Reviews
+    getReviews: adminGetReviews,
+    getReview: adminGetReview,
+    moderateReview: adminModerateReview,
   };
 }
 

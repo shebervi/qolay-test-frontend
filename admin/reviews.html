@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Админ панель - QolayKZ</title>
+  <title>Модерация отзывов - QolayKZ Admin</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <link rel="stylesheet" href="../css/styles.css">
   <link rel="stylesheet" href="css/admin.css">
@@ -15,7 +15,7 @@
         <h1>QolayKZ Admin</h1>
       </div>
       <nav class="sidebar-nav">
-        <a href="index.html" class="nav-item active" data-page="dashboard">
+        <a href="index.html" class="nav-item" data-page="dashboard">
           <i class="fas fa-chart-line"></i> Главная
         </a>
         <a href="owners.html" class="nav-item" data-page="owners">
@@ -45,7 +45,7 @@
         <a href="orders.html" class="nav-item" data-page="orders">
           <i class="fas fa-box"></i> Заказы
         </a>
-        <a href="reviews.html" class="nav-item" data-page="reviews">
+        <a href="reviews.html" class="nav-item active" data-page="reviews">
           <i class="fas fa-star"></i> Отзывы
         </a>
       </nav>
@@ -53,43 +53,61 @@
 
     <main class="admin-main">
       <header class="admin-header">
-        <h2>Панель управления</h2>
+        <h2>Модерация отзывов</h2>
         <div class="header-actions">
           <span id="user-info" style="margin-right: 16px; color: #666;"></span>
-          <button class="btn btn-secondary" onclick="window.location.href='../index.html'" style="margin-right: 8px;">
-            Вернуться на сайт
-          </button>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <select id="status-filter" class="input" style="width: 200px;" onchange="loadReviews()">
+              <option value="">Все статусы</option>
+              <option value="PENDING">Ожидают модерации</option>
+              <option value="APPROVED">Одобренные</option>
+              <option value="REJECTED">Отклоненные</option>
+            </select>
+            <select id="restaurant-filter" class="input" style="width: 250px;" onchange="loadReviews()">
+              <option value="">Все рестораны</option>
+            </select>
+          </div>
+          <div>
+            <button class="btn btn-secondary" onclick="loadReviews()">
+              🔄 Обновить
+            </button>
+          </div>
         </div>
       </header>
 
       <div class="admin-content">
-        <div class="dashboard-grid">
-          <div class="stat-card">
-            <h3>Рестораны</h3>
-            <div class="stat-value" id="restaurants-count">-</div>
-          </div>
-          <div class="stat-card">
-            <h3>Столы</h3>
-            <div class="stat-value" id="tables-count">-</div>
-          </div>
-          <div class="stat-card">
-            <h3>Категории</h3>
-            <div class="stat-value" id="categories-count">-</div>
-          </div>
-          <div class="stat-card">
-            <h3>Продукты</h3>
-            <div class="stat-value" id="products-count">-</div>
-          </div>
-        </div>
-
-        <div class="dashboard-section">
-          <h3>Последние рестораны</h3>
-          <div id="recent-restaurants" class="list-container">
-            <div class="loading">Загрузка...</div>
-          </div>
+        <div id="reviews-list" class="list-container">
+          <div class="loading">Загрузка отзывов...</div>
         </div>
       </div>
     </main>
+  </div>
+
+  <!-- Модальное окно для модерации -->
+  <div id="moderate-modal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3>Модерация отзыва</h3>
+        <button class="modal-close" onclick="closeModerateModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="review-details" style="margin-bottom: 20px;">
+          <!-- Детали отзыва будут загружены через JS -->
+        </div>
+        <div style="margin-bottom: 16px;">
+          <label class="input-label">Комментарий модератора (опционально):</label>
+          <textarea id="moderation-comment" class="input" rows="3" placeholder="Укажите причину решения..."></textarea>
+        </div>
+        <div style="display: flex; gap: 12px; justify-content: flex-end;">
+          <button class="btn btn-danger" onclick="moderateReview('REJECTED')">
+            Отклонить
+          </button>
+          <button class="btn btn-primary" onclick="moderateReview('APPROVED')">
+            Одобрить
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="../config.js"></script>
@@ -98,7 +116,7 @@
   <script src="../js/auth.js"></script>
   <script src="js/admin-auth.js"></script>
   <script src="js/admin-api.js"></script>
-  <script src="js/dashboard.js"></script>
+  <script src="js/reviews.js"></script>
 </body>
 </html>
 

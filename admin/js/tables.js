@@ -197,7 +197,7 @@ async function showQR(id) {
     currentQRTokenHash = null;
   }
   
-  // Загружаем QR код
+  // Загружаем QR код (всегда в PNG для предпросмотра)
   const preview = document.getElementById('qr-preview');
   preview.innerHTML = '<div class="loading">Загрузка QR кода...</div>';
   
@@ -209,7 +209,7 @@ async function showQR(id) {
       headers['Authorization'] = `Bearer ${token}`;
     }
     
-    const response = await fetch(`${CONFIG.API_BASE_URL}/admin/tables/${id}/qr`, {
+    const response = await fetch(`${CONFIG.API_BASE_URL}/admin/tables/${id}/qr?format=png`, {
       headers,
     });
     
@@ -242,7 +242,9 @@ async function downloadQR() {
   if (!currentQRTableId) return;
   
   try {
-    await AdminAPI.downloadQR(currentQRTableId);
+    const formatSelect = document.getElementById('qr-format-select');
+    const format = formatSelect ? formatSelect.value : 'png';
+    await AdminAPI.downloadQR(currentQRTableId, format);
     Utils.showSuccess('QR код скачан');
   } catch (error) {
     console.error('Failed to download QR:', error);
@@ -300,10 +302,10 @@ function openQRLink() {
   }
   
   // Формируем URL для меню стола
-  // URL имеет формат: /?table={qrTokenHash}
-  // Используем тот же origin, что и текущая страница
+  // URL имеет формат: /guests.html?table={qrTokenHash}
+  // Используем тот же origin, что и текущая страница, но заменяем путь
   const currentOrigin = window.location.origin;
-  const qrUrl = `${currentOrigin}/?table=${currentQRTokenHash}`;
+  const qrUrl = `${currentOrigin}/guests.html?table=${currentQRTokenHash}`;
   
   // Открываем в новой вкладке
   window.open(qrUrl, '_blank');
@@ -327,6 +329,17 @@ async function updateTableStatus(id, status) {
   }
 }
 
+async function downloadAllQR() {
+  try {
+    const restaurantId = document.getElementById('restaurant-filter')?.value || undefined;
+    await AdminAPI.downloadAllQR(restaurantId);
+    Utils.showSuccess('Все QR коды скачаны');
+  } catch (error) {
+    console.error('Failed to download all QR codes:', error);
+    Utils.showError('Не удалось скачать QR коды');
+  }
+}
+
 // Экспорт
 window.openTableModal = openTableModal;
 window.closeTableModal = closeTableModal;
@@ -335,6 +348,7 @@ window.deleteTable = deleteTable;
 window.showQR = showQR;
 window.closeQRModal = closeQRModal;
 window.downloadQR = downloadQR;
+window.downloadAllQR = downloadAllQR;
 window.rotateQRToken = rotateQRToken;
 window.updateTableStatus = updateTableStatus;
 window.openQRLink = openQRLink;

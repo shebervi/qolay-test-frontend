@@ -32,7 +32,22 @@
           Ваш заказ принят в обработку. Официант скоро подойдет к вашему столу.
         </p>
 
-        <div style="display: flex; flex-direction: column; gap: 12px;">
+        <!-- Кнопка оставить отзыв -->
+        <div id="review-button-container" style="margin-bottom: 24px; display: none;">
+          <button id="leave-review-btn" class="btn btn-primary" style="width: 100%; padding: 16px; font-size: 16px; font-weight: 600;">
+            ⭐ Оставить отзыв
+          </button>
+        </div>
+
+        <!-- Секция отзывов (показывается после авторизации) -->
+        <div id="reviews-section" style="margin-top: 32px; padding-top: 32px; border-top: 2px solid #e0e0e0; width: 100%; display: none;">
+          <h2 style="font-size: 20px; font-weight: 600; margin-bottom: 16px; text-align: center;">Оставить отзыв</h2>
+          <div id="reviews-items-container">
+            <!-- Элементы для отзывов будут добавлены через JS -->
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 24px;">
           <button onclick="window.location.href='menu.html'" class="btn btn-primary" style="width: 100%;">
             Продолжить заказ
           </button>
@@ -60,11 +75,12 @@
   <script src="config.js"></script>
   <script src="js/utils.js"></script>
   <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const orderId = urlParams.get('order');
-
+      
       const loadingIndicator = document.getElementById('loading');
       const successContent = document.getElementById('success-content');
       const errorContent = document.getElementById('error-content');
@@ -80,8 +96,27 @@
 
       try {
         loadingIndicator.style.display = 'block';
-        const order = await API.getOrder(orderId);
+        let order = await API.getOrder(orderId);
         loadingIndicator.style.display = 'none';
+
+        // Проверяем, вернулись ли мы после авторизации
+        // Если пользователь авторизован, пытаемся привязать заказ
+        if (typeof Auth !== 'undefined' && Auth.isAuthenticated() && Auth.isUser()) {
+          if (!order.account_id) {
+            try {
+              // Сначала пробуем с сохраненным токеном, если есть
+              const savedClaimToken = localStorage.getItem(`claim_token_${orderId}`);
+              await API.claimOrder(orderId, savedClaimToken || null);
+              localStorage.removeItem(`claim_token_${orderId}`);
+              console.log('Order claimed successfully');
+              // Перезагружаем заказ для получения обновленной информации
+              order = await API.getOrder(orderId);
+            } catch (error) {
+              console.error('Failed to claim order:', error);
+              // Продолжаем работу, даже если не удалось привязать
+            }
+          }
+        }
 
         // Отобразить информацию о заказе
         const statusLabels = {
@@ -194,11 +229,376 @@
         `;
 
         successContent.style.display = 'block';
+        
+        // Сохраняем claim_token, если он есть в ответе (возвращается при обновлении статуса)
+        if (order.claim_token) {
+          localStorage.setItem(`claim_token_${order.id}`, order.claim_token);
+        }
+
+        // Если пользователь авторизован и вернулся после авторизации, показываем секцию отзывов сразу
+        const isAuth = typeof Auth !== 'undefined' && Auth.isAuthenticated() && Auth.isUser();
+        if (isAuth) {
+          await initReviewsSection(order);
+        } else {
+          // Иначе показываем кнопку
+          await initReviewButton(order);
+        }
       } catch (error) {
         loadingIndicator.style.display = 'none';
         errorContent.style.display = 'block';
         errorMessage.textContent = 'Не удалось загрузить информацию о заказе: ' + error.message;
         console.error('Failed to load order:', error);
+      }
+    });
+
+    let currentOrder = null;
+    let claimToken = null;
+
+    /**
+     * Инициализация кнопки отзыва
+     */
+    async function initReviewButton(order) {
+      currentOrder = order;
+      const reviewButtonContainer = document.getElementById('review-button-container');
+      const leaveReviewBtn = document.getElementById('leave-review-btn');
+      
+      if (!reviewButtonContainer || !leaveReviewBtn) return;
+
+      // Проверяем, можно ли оставить отзыв (статус PAID, SERVED, CLOSED)
+      const canReview = ['PAID', 'SERVED', 'CLOSED'].includes(order.status);
+      if (!canReview) {
+        reviewButtonContainer.style.display = 'none';
+        return;
+      }
+
+      // Показываем кнопку
+      reviewButtonContainer.style.display = 'block';
+
+      // Обработчик клика на кнопку
+      leaveReviewBtn.onclick = async () => {
+        await handleLeaveReviewClick(order);
+      };
+    }
+
+    /**
+     * Обработка клика на кнопку "Оставить отзыв"
+     */
+    async function handleLeaveReviewClick(order) {
+      // Проверяем авторизацию
+      const isAuth = typeof Auth !== 'undefined' && Auth.isAuthenticated() && Auth.isUser();
+      
+      if (!isAuth) {
+        // Переход на авторизацию с redirect
+        const redirectUrl = window.location.href;
+        window.location.href = `user-login.html?redirect=${encodeURIComponent(redirectUrl)}`;
+        return;
+      }
+
+      // Пользователь авторизован - привязываем заказ и показываем форму отзывов
+      const currentUser = Auth.getAuthUser();
+      
+      // Проверяем, привязан ли заказ к аккаунту
+      if (!order.account_id) {
+        // Пытаемся привязать заказ, если есть claim_token
+        const savedClaimToken = localStorage.getItem(`claim_token_${order.id}`);
+        if (savedClaimToken) {
+          try {
+            await API.claimOrder(order.id, savedClaimToken);
+            localStorage.removeItem(`claim_token_${order.id}`);
+            // Перезагружаем заказ для получения обновленной информации
+            const updatedOrder = await API.getOrder(order.id);
+            currentOrder = updatedOrder;
+            order = updatedOrder;
+          } catch (error) {
+            console.error('Failed to claim order:', error);
+            if (typeof Utils !== 'undefined' && Utils.showError) {
+              Utils.showError('Не удалось привязать заказ к аккаунту. Попробуйте обновить страницу.');
+            } else {
+              alert('Не удалось привязать заказ к аккаунту. Попробуйте обновить страницу.');
+            }
+            return;
+          }
+        } else {
+          // Заказ не привязан и нет claim_token
+          if (typeof Utils !== 'undefined' && Utils.showError) {
+            Utils.showError('Заказ не привязан к вашему аккаунту. Отзыв можно оставить только на привязанные заказы.');
+          } else {
+            alert('Заказ не привязан к вашему аккаунту. Отзыв можно оставить только на привязанные заказы.');
+          }
+          return;
+        }
+      }
+
+      // Проверяем, что заказ привязан к текущему пользователю
+      if (order.account_id && order.account_id !== currentUser?.id) {
+        if (typeof Utils !== 'undefined' && Utils.showError) {
+          Utils.showError('Этот заказ принадлежит другому пользователю');
+        } else {
+          alert('Этот заказ принадлежит другому пользователю');
+        }
+        return;
+      }
+
+      // Проверяем 3-дневный лимит
+      const orderDate = new Date(order.created_at);
+      const threeDaysAgo = new Date();
+      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+      const canReviewTime = orderDate >= threeDaysAgo;
+
+      if (!canReviewTime) {
+        if (typeof Utils !== 'undefined' && Utils.showError) {
+          Utils.showError('Отзыв можно оставить только в течение 3 дней с момента создания заказа');
+        } else {
+          alert('Отзыв можно оставить только в течение 3 дней с момента создания заказа');
+        }
+        return;
+      }
+
+      // Скрываем кнопку и показываем секцию отзывов
+      document.getElementById('review-button-container').style.display = 'none';
+      const reviewsSection = document.getElementById('reviews-section');
+      reviewsSection.style.display = 'block';
+      
+      // Отображаем элементы для отзывов
+      renderReviewItems(order);
+    }
+
+    /**
+     * Инициализация секции отзывов (для случая, когда пользователь уже авторизован)
+     */
+    async function initReviewsSection(order) {
+      currentOrder = order;
+      const reviewsSection = document.getElementById('reviews-section');
+      const reviewsItemsContainer = document.getElementById('reviews-items-container');
+      
+      if (!reviewsSection) return;
+
+      // Проверяем, можно ли оставить отзыв (статус PAID, SERVED, CLOSED)
+      const canReview = ['PAID', 'SERVED', 'CLOSED'].includes(order.status);
+      if (!canReview) {
+        reviewsSection.style.display = 'none';
+        return;
+      }
+
+      // Проверяем авторизацию
+      const isAuth = typeof Auth !== 'undefined' && Auth.isAuthenticated() && Auth.isUser();
+      
+      if (!isAuth) {
+        reviewsSection.style.display = 'none';
+        return;
+      }
+
+      // Пользователь авторизован
+      reviewsSection.style.display = 'block';
+      document.getElementById('review-button-container').style.display = 'none';
+
+      // Проверяем, привязан ли заказ к аккаунту
+      const currentUser = Auth.getAuthUser();
+      
+      if (!order.account_id) {
+        // Пытаемся привязать заказ автоматически (с токеном или без)
+        try {
+          const savedClaimToken = localStorage.getItem(`claim_token_${order.id}`);
+          await API.claimOrder(order.id, savedClaimToken || null);
+          localStorage.removeItem(`claim_token_${order.id}`);
+          // Перезагружаем заказ для получения обновленной информации
+          const updatedOrder = await API.getOrder(order.id);
+          currentOrder = updatedOrder;
+          order = updatedOrder;
+        } catch (error) {
+          console.error('Failed to claim order:', error);
+          // Если заказ не в нужном статусе, показываем соответствующее сообщение
+          if (!['PAID', 'SERVED', 'CLOSED'].includes(order.status)) {
+            reviewsItemsContainer.innerHTML = '<p style="text-align: center; color: #888; padding: 16px;">Заказ еще не оплачен. Отзыв можно оставить только после оплаты заказа.</p>';
+          } else {
+            reviewsItemsContainer.innerHTML = '<p style="text-align: center; color: #888; padding: 16px;">Не удалось привязать заказ к аккаунту. Попробуйте обновить страницу.</p>';
+          }
+          return;
+        }
+      }
+
+      // Проверяем, что заказ привязан к текущему пользователю
+      if (order.account_id && order.account_id !== currentUser?.id) {
+        reviewsItemsContainer.innerHTML = '<p style="text-align: center; color: #888;">Этот заказ принадлежит другому пользователю</p>';
+        return;
+      }
+
+      // Отображаем элементы для отзывов
+      renderReviewItems(order);
+    }
+
+    /**
+     * Отобразить элементы для отзывов
+     */
+    function renderReviewItems(order) {
+      const reviewsItemsContainer = document.getElementById('reviews-items-container');
+      if (!reviewsItemsContainer || !order.items || order.items.length === 0) {
+        reviewsItemsContainer.innerHTML = '<p style="text-align: center; color: #888;">Нет позиций для отзыва</p>';
+        return;
+      }
+
+      // Проверяем 3-дневный лимит
+      const orderDate = new Date(order.created_at);
+      const threeDaysAgo = new Date();
+      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+      const canReviewTime = orderDate >= threeDaysAgo;
+
+      if (!canReviewTime) {
+        reviewsItemsContainer.innerHTML = '<p style="text-align: center; color: #888;">Отзыв можно оставить только в течение 3 дней с момента создания заказа</p>';
+        return;
+      }
+
+      reviewsItemsContainer.innerHTML = order.items.map((item, index) => {
+        const itemName = item.snapshot_name_ru || item.snapshot_name_kk || item.snapshot_name_en || 'Блюдо';
+        return `
+          <div class="review-item" data-order-item-id="${item.id}" data-product-id="${item.product_id}" style="background: #f9f9f9; padding: 16px; border-radius: 8px; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div style="flex: 1;">
+                <h4 style="margin: 0 0 4px 0; font-size: 16px;">${escapeHtml(itemName)}</h4>
+                <p style="margin: 0; color: #666; font-size: 14px;">Количество: ${item.qty}</p>
+              </div>
+              <button onclick="openReviewModal('${order.id}', '${item.id}', '${item.product_id}', '${escapeHtml(itemName)}')" class="btn btn-primary" style="padding: 8px 16px; white-space: nowrap;">
+                Оставить отзыв
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    /**
+     * Экранировать HTML
+     */
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    /**
+     * Открыть модальное окно для отзыва
+     */
+    function openReviewModal(orderId, orderItemId, productId, productName) {
+      // Создаем модальное окно
+      const modal = document.createElement('div');
+      modal.id = 'review-modal';
+      modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px;';
+      
+      modal.innerHTML = `
+        <div style="background: white; border-radius: 12px; padding: 24px; max-width: 500px; width: 100%; max-height: 90vh; overflow-y: auto;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 style="margin: 0;">Оставить отзыв</h3>
+            <button onclick="closeReviewModal()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">×</button>
+          </div>
+          <div style="margin-bottom: 16px;">
+            <p style="margin: 0 0 12px 0; color: #666;"><strong>Блюдо:</strong> ${escapeHtml(productName)}</p>
+          </div>
+          <div style="margin-bottom: 16px;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500;">Оценка:</label>
+            <div id="rating-stars" style="display: flex; gap: 8px; justify-content: center; margin-bottom: 16px;">
+              ${[1, 2, 3, 4, 5].map(i => `<span onclick="selectRating(${i})" id="star-${i}" style="font-size: 32px; color: #ddd; cursor: pointer; user-select: none;">☆</span>`).join('')}
+            </div>
+            <input type="hidden" id="selected-rating" value="0">
+          </div>
+          <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500;">Комментарий (опционально):</label>
+            <textarea id="review-comment" class="input" rows="4" placeholder="Поделитесь своими впечатлениями..." style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; font-family: inherit; resize: vertical;"></textarea>
+          </div>
+          <div style="display: flex; gap: 12px;">
+            <button onclick="closeReviewModal()" class="btn btn-secondary" style="flex: 1;">Отмена</button>
+            <button onclick="submitReview('${orderId}', '${orderItemId}', '${productId}')" class="btn btn-primary" style="flex: 1;">Отправить</button>
+          </div>
+          <div id="review-error" style="display: none; margin-top: 12px; padding: 12px; background: #fee; border: 1px solid #fcc; border-radius: 4px; color: #c33;"></div>
+        </div>
+      `;
+      
+      document.body.appendChild(modal);
+    }
+
+    let selectedRating = 0;
+
+    /**
+     * Выбрать рейтинг
+     */
+    function selectRating(rating) {
+      selectedRating = rating;
+      document.getElementById('selected-rating').value = rating;
+      
+      // Обновляем звезды
+      for (let i = 1; i <= 5; i++) {
+        const star = document.getElementById(`star-${i}`);
+        if (star) {
+          star.textContent = i <= rating ? '★' : '☆';
+          star.style.color = i <= rating ? '#ffa500' : '#ddd';
+        }
+      }
+    }
+
+    /**
+     * Закрыть модальное окно отзыва
+     */
+    function closeReviewModal() {
+      const modal = document.getElementById('review-modal');
+      if (modal) {
+        modal.remove();
+      }
+      selectedRating = 0;
+    }
+
+    /**
+     * Отправить отзыв
+     */
+    async function submitReview(orderId, orderItemId, productId) {
+      const rating = selectedRating;
+      const comment = document.getElementById('review-comment')?.value.trim() || '';
+      const errorDiv = document.getElementById('review-error');
+
+      if (rating === 0) {
+        errorDiv.textContent = 'Пожалуйста, выберите оценку';
+        errorDiv.style.display = 'block';
+        return;
+      }
+
+      if (rating < 1 || rating > 5) {
+        errorDiv.textContent = 'Оценка должна быть от 1 до 5';
+        errorDiv.style.display = 'block';
+        return;
+      }
+
+      try {
+        errorDiv.style.display = 'none';
+        const submitBtn = event.target;
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Отправка...';
+
+        await API.createReview(orderId, orderItemId, productId, rating, comment);
+        
+        if (typeof Utils !== 'undefined' && Utils.showSuccess) {
+          Utils.showSuccess('Отзыв успешно отправлен!');
+        } else {
+          alert('✅ Отзыв успешно отправлен!');
+        }
+        closeReviewModal();
+        
+        // Обновляем секцию отзывов
+        if (currentOrder) {
+          await initReviewsSection(currentOrder);
+        }
+      } catch (error) {
+        console.error('Failed to create review:', error);
+        errorDiv.textContent = error.message || 'Не удалось отправить отзыв';
+        errorDiv.style.display = 'block';
+        const submitBtn = event.target;
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Отправить';
+      }
+    }
+
+    // Обработка закрытия модального окна по клику вне его
+    document.addEventListener('click', (e) => {
+      const modal = document.getElementById('review-modal');
+      if (modal && e.target === modal) {
+        closeReviewModal();
       }
     });
   </script>

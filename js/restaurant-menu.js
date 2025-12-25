@@ -187,7 +187,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Используем images если есть, иначе imageKeys
     const images = product.images || [];
-    const imageData = images.length > 0 ? images : (product.imageKeys || (product.imageKey ? [product.imageKey] : []));
+    const imageData = images.length > 0 ? images : (product.imageKeys || []);
     const imageUrl = Utils.getProductImageUrl(imageData, product.id, 0);
     const name = Utils.getProductName(product.name);
     const description = Utils.getProductDescription(product.description);

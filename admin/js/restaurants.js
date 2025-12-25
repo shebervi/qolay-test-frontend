@@ -89,7 +89,7 @@ async function loadRestaurants() {
           ` : ''}
           <div>
             <h4>${restaurant.name}</h4>
-            <p>${restaurant.city} • Владелец: ${restaurant.owner?.full_name || 'N/A'} • Столов: ${restaurant._count?.tables || 0} ${restaurant.logo_key ? '• Логотип загружен' : ''}</p>
+            <p>${restaurant.city} • Владелец: ${restaurant.owner?.full_name || 'N/A'} • Столов: ${restaurant._count?.tables || 0} • Блюд: ${restaurant._count?.products || 0} ${restaurant.logo_key ? '• Логотип загружен' : ''}</p>
           </div>
         </div>
         <div class="list-item-actions">

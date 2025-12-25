@@ -391,30 +391,35 @@ async function saveProduct() {
       isActive: true,
     };
 
+    // Получаем файлы изображений
+    const imageFiles = Array.from(document.getElementById('product-image').files);
+
     let productId = currentProductId;
 
     if (currentProductId) {
+      // При обновлении изображения загружаем отдельно (как раньше)
       await AdminAPI.updateProduct(currentProductId, data);
       Utils.showSuccess('Продукт обновлен');
       productId = currentProductId;
-    } else {
-      const response = await AdminAPI.createProduct(data);
-      productId = response.data?.id || response.data?.data?.id;
-      Utils.showSuccess('Продукт создан');
-    }
 
-    // Загружаем изображения, если выбраны
-    const imageFiles = Array.from(document.getElementById('product-image').files);
-    if (imageFiles.length > 0 && productId) {
-      try {
-        for (const imageFile of imageFiles) {
-          await AdminAPI.uploadProductImage(productId, imageFile);
+      // Загружаем новые изображения, если выбраны
+      if (imageFiles.length > 0) {
+        try {
+          for (const imageFile of imageFiles) {
+            await AdminAPI.uploadProductImage(productId, imageFile);
+          }
+          Utils.showSuccess(`Загружено изображений: ${imageFiles.length}`);
+        } catch (error) {
+          console.error('Failed to upload images:', error);
+          Utils.showError('Не удалось загрузить изображения, но продукт сохранен');
         }
-        Utils.showSuccess(`Загружено изображений: ${imageFiles.length}`);
-      } catch (error) {
-        console.error('Failed to upload images:', error);
-        Utils.showError('Не удалось загрузить изображения, но продукт сохранен');
       }
+    } else {
+      // При создании передаем файлы сразу
+      const response = await AdminAPI.createProduct(data, imageFiles);
+      productId = response.data?.id || response.data?.data?.id;
+      const imageCount = imageFiles.length > 0 ? ` с ${imageFiles.length} изображением(ями)` : '';
+      Utils.showSuccess(`Продукт создан${imageCount}`);
     }
 
     closeProductModal();

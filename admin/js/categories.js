@@ -74,11 +74,12 @@ async function loadCategories(restaurantId = null) {
 
     container.innerHTML = categories.map(category => {
       const restaurant = restaurants.find(r => r.id === category.restaurant_id);
+      const productsCount = category._count?.products || 0;
       return `
         <div class="list-item">
           <div class="list-item-info">
             <h4>${category.name_ru || category.name_kk || category.name_en}</h4>
-            <p>${restaurant?.name || 'Ресторан не найден'} • Порядок: ${category.sort_order || 0}</p>
+            <p>${restaurant?.name || 'Ресторан не найден'} • Порядок: ${category.sort_order || 0} • Блюд: ${productsCount}</p>
           </div>
           <div class="list-item-actions">
             ${canEditCategory ? `

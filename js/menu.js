@@ -33,6 +33,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   const productsList = document.getElementById('products-list');
   const loadingIndicator = document.getElementById('loading');
   const hideCategoriesBtn = document.getElementById('hide-categories');
+  const profileLink = document.getElementById('profile-link');
+
+  // Показываем ссылку на профиль, если пользователь авторизован
+  if (profileLink && typeof Auth !== 'undefined' && Auth.isAuthenticated() && Auth.isUser()) {
+    profileLink.style.display = 'block';
+  }
 
   // Загрузить меню
   try {
@@ -196,7 +202,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Используем images если есть, иначе imageKeys
     const images = product.images || [];
-    const imageData = images.length > 0 ? images : (product.imageKeys || (product.imageKey ? [product.imageKey] : []));
+    const imageData = images.length > 0 ? images : (product.imageKeys || []);
     const imageUrl = Utils.getProductImageUrl(imageData, product.id, 0);
     const name = Utils.getProductName(product.name);
     const description = Utils.getProductDescription(product.description);

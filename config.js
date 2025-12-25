@@ -8,8 +8,11 @@
  */
 const CONFIG = {
   // Базовый URL API (можно переопределить через localStorage)
-  API_BASE_URL: localStorage.getItem('API_BASE_URL') || 'https://api.qolay.kz',
-  //123
+  // Для локальной разработки используем localhost, для продакшна - api.qolay.kz
+  API_BASE_URL: localStorage.getItem('API_BASE_URL') || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+    ? `http://${window.location.hostname}:3000` 
+    : 'https://api.qolay.kz'),
+  
   // Ключи для localStorage
   STORAGE_KEYS: {
     SESSION_ID: 'cart_session_id',

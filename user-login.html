@@ -220,6 +220,11 @@
         <form id="otp-form">
           <div class="form-group">
             <label>Введите код из SMS</label>
+            <!-- Временный блок для отображения OTP кода (только для разработки) -->
+            <div id="otp-code-display" style="display: none; background: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; padding: 12px; margin-bottom: 16px; text-align: center;">
+              <div style="font-size: 12px; color: #856404; margin-bottom: 4px;">Код для разработки (временно):</div>
+              <div style="font-size: 24px; font-weight: 600; color: #856404; letter-spacing: 4px;" id="otp-code-value"></div>
+            </div>
             <div class="otp-input-group">
               <input type="text" class="otp-input" id="otp-1" maxlength="1" pattern="[0-9]" required>
               <input type="text" class="otp-input" id="otp-2" maxlength="1" pattern="[0-9]" required>

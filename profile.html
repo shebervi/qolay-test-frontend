@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Профиль - QolayKZ</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .profile-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .profile-header {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .profile-header h1 {
+      margin: 0 0 16px 0;
+      color: #333;
+    }
+
+    .profile-info {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .profile-info-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .profile-info-item strong {
+      min-width: 120px;
+      color: #666;
+    }
+
+    .profile-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+      border-bottom: 2px solid #e0e0e0;
+    }
+
+    .profile-tab {
+      padding: 12px 24px;
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      cursor: pointer;
+      font-size: 16px;
+      color: #666;
+      transition: all 0.3s;
+    }
+
+    .profile-tab.active {
+      color: var(--primary-color, #ff6b35);
+      border-bottom-color: var(--primary-color, #ff6b35);
+      font-weight: 600;
+    }
+
+    .profile-tab:hover {
+      color: var(--primary-color, #ff6b35);
+    }
+
+    .profile-content {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      min-height: 400px;
+    }
+
+    .orders-list, .reviews-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .order-card, .review-card {
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 16px;
+      transition: box-shadow 0.3s;
+    }
+
+    .order-card:hover, .review-card:hover {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .order-header, .review-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .order-number {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--primary-color, #ff6b35);
+    }
+
+    .order-status, .review-status {
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .order-status.PAID { background: #d4edda; color: #155724; }
+    .order-status.SERVED { background: #d4edda; color: #155724; }
+    .order-status.CLOSED { background: #d1ecf1; color: #0c5460; }
+    .order-status.COOKING { background: #fff3cd; color: #856404; }
+    .order-status.READY { background: #d4edda; color: #155724; }
+    .order-status.CANCELED { background: #f8d7da; color: #721c24; }
+
+    .review-status.APPROVED { background: #d4edda; color: #155724; }
+    .review-status.PENDING { background: #fff3cd; color: #856404; }
+    .review-status.REJECTED { background: #f8d7da; color: #721c24; }
+
+    .order-details, .review-details {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      color: #666;
+      font-size: 14px;
+    }
+
+    .order-items {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #e0e0e0;
+    }
+
+    .order-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+    }
+
+    .review-rating {
+      display: flex;
+      gap: 4px;
+      margin: 8px 0;
+    }
+
+    .review-rating .star {
+      color: #ffa500;
+      font-size: 18px;
+    }
+
+    .review-rating .star.empty {
+      color: #ddd;
+    }
+
+    .review-comment {
+      margin-top: 8px;
+      padding: 12px;
+      background: #f9f9f9;
+      border-radius: 6px;
+      color: #333;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #999;
+    }
+
+    .empty-state i {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+
+    .error-message {
+      background: #fee;
+      border: 1px solid #fcc;
+      border-radius: 8px;
+      padding: 16px;
+      color: #c33;
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="page-container">
+    <header class="header">
+      <div class="header-content">
+        <div class="header-title">Профиль</div>
+        <div class="header-actions">
+          <a href="index.html" class="btn btn-secondary" style="padding: 8px 16px;">
+            <i class="fas fa-home"></i> Главная
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <div class="container profile-container">
+      <div id="loading" class="loading" style="display: none;">
+        <div class="spinner"></div>
+        <p>Загрузка...</p>
+      </div>
+
+      <div id="error-message" class="error-message" style="display: none;"></div>
+
+      <div id="profile-content" style="display: none;">
+        <!-- Профиль пользователя -->
+        <div class="profile-header">
+          <h1><i class="fas fa-user"></i> Мой профиль</h1>
+          <div class="profile-info" id="profile-info">
+            <!-- Информация о пользователе будет загружена через JS -->
+          </div>
+        </div>
+
+        <!-- Вкладки -->
+        <div class="profile-tabs">
+          <button class="profile-tab active" data-tab="orders" onclick="switchTab('orders')">
+            <i class="fas fa-shopping-bag"></i> Мои заказы
+          </button>
+          <button class="profile-tab" data-tab="reviews" onclick="switchTab('reviews')">
+            <i class="fas fa-star"></i> Мои отзывы
+          </button>
+        </div>
+
+        <!-- Контент вкладок -->
+        <div class="profile-content">
+          <div id="orders-tab" class="tab-content">
+            <div id="orders-list" class="orders-list">
+              <!-- Заказы будут загружены через JS -->
+            </div>
+          </div>
+
+          <div id="reviews-tab" class="tab-content" style="display: none;">
+            <div id="reviews-list" class="reviews-list">
+              <!-- Отзывы будут загружены через JS -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/profile.js"></script>
+</body>
+</html>
+

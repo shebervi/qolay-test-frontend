@@ -125,6 +125,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       validateModifiers();
     }
 
+    // Загрузить отзывы
+    await loadReviews(productId);
+
     loadingIndicator.style.display = 'none';
   } catch (error) {
     loadingIndicator.style.display = 'none';
@@ -246,6 +249,68 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  /**
+   * Загрузить и отобразить отзывы
+   */
+  async function loadReviews(productId) {
+    const reviewsContainer = document.getElementById('reviews-container');
+    const noReviews = document.getElementById('no-reviews');
+    
+    if (!reviewsContainer) return;
+    
+    try {
+      const reviews = await API.getProductReviews(productId);
+      
+      if (!reviews || reviews.length === 0) {
+        reviewsContainer.style.display = 'none';
+        if (noReviews) {
+          noReviews.style.display = 'block';
+        }
+        return;
+      }
+      
+      reviewsContainer.innerHTML = reviews.map(review => {
+        const stars = '★'.repeat(review.rating) + '☆'.repeat(5 - review.rating);
+        const date = new Date(review.created_at).toLocaleDateString('ru-RU', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+        const userName = review.account?.name || review.account?.phone || 'Анонимный пользователь';
+        
+        return `
+          <div style="padding: 16px; border: 1px solid #e0e0e0; border-radius: 8px; background: #f9f9f9;">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+              <div>
+                <div style="font-weight: 600; margin-bottom: 4px;">${userName}</div>
+                <div style="color: #ffa500; font-size: 18px; margin-bottom: 4px;">${stars}</div>
+              </div>
+              <div style="color: #888; font-size: 12px;">${date}</div>
+            </div>
+            ${review.comment ? `<p style="margin-top: 8px; color: #333; line-height: 1.5;">${escapeHtml(review.comment)}</p>` : ''}
+          </div>
+        `;
+      }).join('');
+      
+      reviewsContainer.style.display = 'flex';
+      if (noReviews) {
+        noReviews.style.display = 'none';
+      }
+    } catch (error) {
+      console.error('Failed to load reviews:', error);
+      reviewsContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: #888;">Не удалось загрузить отзывы</div>';
+    }
+  }
+
+  /**
+   * Экранировать HTML для безопасности
+   */
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
   // Инициализация
   if (!isPublic) {
   updateQuantityDisplay();
@@ -259,7 +324,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function renderProduct(product, currency = '₸') {
     // Используем images если есть (массив объектов с id), иначе imageKeys
     const images = product.images || [];
-    const imageData = images.length > 0 ? images : (product.imageKeys || (product.imageKey ? [product.imageKey] : []));
+    const imageData = images.length > 0 ? images : (product.imageKeys || []);
     const imageUrl = Utils.getProductImageUrl(imageData, product.id, 0);
     const name = Utils.getProductName(product.name);
     const description = Utils.getProductDescription(product.description);

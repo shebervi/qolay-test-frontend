@@ -215,6 +215,98 @@ async function getOrder(orderId) {
   return response.data;
 }
 
+/**
+ * Получить публичные отзывы на продукт
+ * @param {string} productId - ID продукта
+ * @returns {Promise<Array>}
+ */
+async function getProductReviews(productId) {
+  const response = await apiRequest(`/public/products/${productId}/reviews`);
+  return response.data;
+}
+
+/**
+ * Привязать заказ к аккаунту
+ * @param {string} orderId - ID заказа
+ * @param {string} claimToken - Токен для привязки заказа (опционально, если не указан, заказ будет привязан автоматически)
+ * @returns {Promise<object>}
+ */
+async function claimOrder(orderId, claimToken) {
+  const body = claimToken 
+    ? JSON.stringify({ claim_token: claimToken })
+    : JSON.stringify({});
+  const response = await apiRequest(`/public/orders/${orderId}/claim`, {
+    method: 'POST',
+    body: body,
+  });
+  return response.data;
+}
+
+/**
+ * Создать отзыв на блюдо
+ * @param {string} orderId - ID заказа
+ * @param {string} orderItemId - ID элемента заказа
+ * @param {string} productId - ID продукта
+ * @param {number} rating - Оценка от 1 до 5
+ * @param {string} comment - Комментарий (опционально)
+ * @returns {Promise<object>}
+ */
+async function createReview(orderId, orderItemId, productId, rating, comment) {
+  const response = await apiRequest('/reviews', {
+    method: 'POST',
+    body: JSON.stringify({
+      order_id: orderId,
+      order_item_id: orderItemId,
+      product_id: productId,
+      rating,
+      comment: comment || undefined,
+    }),
+  });
+  return response.data;
+}
+
+/**
+ * Получить заказы пользователя
+ * @param {object} filters - Фильтры (status, dateFrom, dateTo и т.д.)
+ * @returns {Promise<Array>}
+ */
+async function getUserOrders(filters = {}) {
+  let url = '/public/orders';
+  const params = [];
+  if (filters.status) {
+    if (Array.isArray(filters.status)) {
+      filters.status.forEach(s => params.push(`status=${encodeURIComponent(s)}`));
+    } else {
+      params.push(`status=${encodeURIComponent(filters.status)}`);
+    }
+  }
+  if (filters.dateFrom) params.push(`dateFrom=${encodeURIComponent(filters.dateFrom)}`);
+  if (filters.dateTo) params.push(`dateTo=${encodeURIComponent(filters.dateTo)}`);
+  if (params.length > 0) url += '?' + params.join('&');
+  const response = await apiRequest(url);
+  return response.data;
+}
+
+/**
+ * Получить отзывы пользователя
+ * @param {object} filters - Фильтры (status и т.д.)
+ * @returns {Promise<Array>}
+ */
+async function getUserReviews(filters = {}) {
+  let url = '/reviews';
+  const params = [];
+  if (filters.status) {
+    if (Array.isArray(filters.status)) {
+      filters.status.forEach(s => params.push(`status=${encodeURIComponent(s)}`));
+    } else {
+      params.push(`status=${encodeURIComponent(filters.status)}`);
+    }
+  }
+  if (params.length > 0) url += '?' + params.join('&');
+  const response = await apiRequest(url);
+  return response.data;
+}
+
 // Экспорт функций
 if (typeof window !== 'undefined') {
   window.API = {
@@ -229,6 +321,11 @@ if (typeof window !== 'undefined') {
     getRestaurantMenu,
     createOrder,
     getOrder,
+    getProductReviews,
+    claimOrder,
+    createReview,
+    getUserOrders,
+    getUserReviews,
   };
 }
 
