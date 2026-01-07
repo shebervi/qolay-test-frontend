@@ -1977,3 +1977,139 @@
   }
 }
 
+/* Analytics Dashboard */
+.dashboard-filter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 20px;
+  background: var(--admin-card-bg);
+  border-radius: var(--admin-radius-lg);
+  box-shadow: var(--admin-shadow);
+  border: 1px solid var(--admin-border);
+}
+
+.dashboard-filter label {
+  font-weight: 600;
+  color: var(--admin-text);
+  font-size: 14px;
+}
+
+.date-input {
+  padding: 10px 16px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  font-size: 14px;
+  color: var(--admin-text);
+  background: var(--admin-card-bg);
+  transition: all 0.2s ease;
+}
+
+.date-input:focus {
+  outline: none;
+  border-color: var(--admin-primary);
+  box-shadow: 0 0 0 3px rgba(201, 72, 26, 0.1);
+}
+
+.analytics-card {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.analytics-card .stat-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: var(--admin-radius);
+  background: linear-gradient(135deg, rgba(201, 72, 26, 0.1) 0%, rgba(201, 72, 26, 0.05) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  color: var(--admin-primary);
+  flex-shrink: 0;
+}
+
+.analytics-card .stat-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.analytics-card .stat-info h4 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--admin-text-secondary);
+  margin: 0 0 8px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.analytics-card .stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--admin-text);
+  line-height: 1.2;
+}
+
+.dashboard-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 1024px) {
+  .dashboard-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.qr-scans-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.qr-scan-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: var(--admin-bg);
+  border-radius: var(--admin-radius);
+  border: 1px solid var(--admin-border);
+}
+
+.qr-scan-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--admin-text-secondary);
+}
+
+.qr-scan-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--admin-text);
+}
+
+.status-success {
+  background: rgba(34, 197, 94, 0.1);
+  color: #16a34a;
+}
+
+.status-warning {
+  background: rgba(234, 179, 8, 0.1);
+  color: #ca8a04;
+}
+
+.status-info {
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+}
+
+.status-error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+}
+

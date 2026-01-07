@@ -96,24 +96,36 @@
 
       try {
         loadingIndicator.style.display = 'block';
-        let order = await API.getOrder(orderId);
+        let order;
+        
+        try {
+          order = await API.getOrder(orderId);
+        } catch (apiError) {
+          loadingIndicator.style.display = 'none';
+          errorContent.style.display = 'block';
+          errorMessage.textContent = 'Не удалось загрузить информацию о заказе: ' + (apiError.message || 'Неизвестная ошибка');
+          console.error('Failed to load order:', apiError);
+          return;
+        }
+        
         loadingIndicator.style.display = 'none';
 
         // Проверяем, вернулись ли мы после авторизации
         // Если пользователь авторизован, пытаемся привязать заказ
+        // Привязка происходит автоматически на бэкенде при авторизации,
+        // но если заказ еще не привязан, пробуем привязать здесь
         if (typeof Auth !== 'undefined' && Auth.isAuthenticated() && Auth.isUser()) {
           if (!order.account_id) {
             try {
-              // Сначала пробуем с сохраненным токеном, если есть
-              const savedClaimToken = localStorage.getItem(`claim_token_${orderId}`);
-              await API.claimOrder(orderId, savedClaimToken || null);
-              localStorage.removeItem(`claim_token_${orderId}`);
+              // Пытаемся привязать заказ без токена (автоматическая привязка на бэкенде)
+              await API.claimOrder(orderId, null);
               console.log('Order claimed successfully');
               // Перезагружаем заказ для получения обновленной информации
               order = await API.getOrder(orderId);
             } catch (error) {
               console.error('Failed to claim order:', error);
               // Продолжаем работу, даже если не удалось привязать
+              // Заказ мог быть уже привязан автоматически при авторизации
             }
           }
         }
@@ -198,7 +210,7 @@
             <strong>Имя гостя:</strong> ${Utils.escapeHtml(order.guest_name || 'Не указано')}
           </div>
           <div style="margin-bottom: 12px;">
-            <strong>Стол:</strong> №${order.table?.number || 'Не указан'}
+            <strong>Стол:</strong> №${order.table?.number || order.snapshot_table_number || 'Не указан'}
           </div>
           <div style="margin-bottom: 12px;">
             <strong>Способ оплаты:</strong> ${paymentMethodLabel}
@@ -229,11 +241,6 @@
         `;
 
         successContent.style.display = 'block';
-        
-        // Сохраняем claim_token, если он есть в ответе (возвращается при обновлении статуса)
-        if (order.claim_token) {
-          localStorage.setItem(`claim_token_${order.id}`, order.claim_token);
-        }
 
         // Если пользователь авторизован и вернулся после авторизации, показываем секцию отзывов сразу
         const isAuth = typeof Auth !== 'undefined' && Auth.isAuthenticated() && Auth.isUser();
@@ -252,7 +259,6 @@
     });
 
     let currentOrder = null;
-    let claimToken = null;
 
     /**
      * Инициализация кнопки отзыва
@@ -299,31 +305,20 @@
       
       // Проверяем, привязан ли заказ к аккаунту
       if (!order.account_id) {
-        // Пытаемся привязать заказ, если есть claim_token
-        const savedClaimToken = localStorage.getItem(`claim_token_${order.id}`);
-        if (savedClaimToken) {
+        // Пытаемся привязать заказ автоматически (без токена)
           try {
-            await API.claimOrder(order.id, savedClaimToken);
-            localStorage.removeItem(`claim_token_${order.id}`);
+          await API.claimOrder(order.id, null);
             // Перезагружаем заказ для получения обновленной информации
             const updatedOrder = await API.getOrder(order.id);
             currentOrder = updatedOrder;
             order = updatedOrder;
           } catch (error) {
             console.error('Failed to claim order:', error);
-            if (typeof Utils !== 'undefined' && Utils.showError) {
-              Utils.showError('Не удалось привязать заказ к аккаунту. Попробуйте обновить страницу.');
-            } else {
-              alert('Не удалось привязать заказ к аккаунту. Попробуйте обновить страницу.');
-            }
-            return;
-          }
-        } else {
-          // Заказ не привязан и нет claim_token
+          // Заказ может быть еще не в статусе, который позволяет привязку
           if (typeof Utils !== 'undefined' && Utils.showError) {
-            Utils.showError('Заказ не привязан к вашему аккаунту. Отзыв можно оставить только на привязанные заказы.');
+            Utils.showError('Не удалось привязать заказ к аккаунту. Заказ может быть еще не оплачен.');
           } else {
-            alert('Заказ не привязан к вашему аккаунту. Отзыв можно оставить только на привязанные заказы.');
+            alert('Не удалось привязать заказ к аккаунту. Заказ может быть еще не оплачен.');
           }
           return;
         }
@@ -396,11 +391,9 @@
       const currentUser = Auth.getAuthUser();
       
       if (!order.account_id) {
-        // Пытаемся привязать заказ автоматически (с токеном или без)
+        // Пытаемся привязать заказ автоматически (без токена)
         try {
-          const savedClaimToken = localStorage.getItem(`claim_token_${order.id}`);
-          await API.claimOrder(order.id, savedClaimToken || null);
-          localStorage.removeItem(`claim_token_${order.id}`);
+          await API.claimOrder(order.id, null);
           // Перезагружаем заказ для получения обновленной информации
           const updatedOrder = await API.getOrder(order.id);
           currentOrder = updatedOrder;
@@ -450,14 +443,17 @@
 
       reviewsItemsContainer.innerHTML = order.items.map((item, index) => {
         const itemName = item.snapshot_name_ru || item.snapshot_name_kk || item.snapshot_name_en || 'Блюдо';
+        // Если product_id null (продукт был удален), используем пустую строку
+        // Отзыв все равно можно оставить, так как данные хранятся в снапшотах
+        const productId = item.product_id || '';
         return `
-          <div class="review-item" data-order-item-id="${item.id}" data-product-id="${item.product_id}" style="background: #f9f9f9; padding: 16px; border-radius: 8px; margin-bottom: 12px;">
+          <div class="review-item" data-order-item-id="${item.id}" data-product-id="${productId}" style="background: #f9f9f9; padding: 16px; border-radius: 8px; margin-bottom: 12px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
               <div style="flex: 1;">
                 <h4 style="margin: 0 0 4px 0; font-size: 16px;">${escapeHtml(itemName)}</h4>
                 <p style="margin: 0; color: #666; font-size: 14px;">Количество: ${item.qty}</p>
               </div>
-              <button onclick="openReviewModal('${order.id}', '${item.id}', '${item.product_id}', '${escapeHtml(itemName)}')" class="btn btn-primary" style="padding: 8px 16px; white-space: nowrap;">
+              <button onclick="openReviewModal('${order.id}', '${item.id}', '${productId}', '${escapeHtml(itemName)}')" class="btn btn-primary" style="padding: 8px 16px; white-space: nowrap;">
                 Оставить отзыв
               </button>
             </div>
@@ -571,7 +567,9 @@
         submitBtn.disabled = true;
         submitBtn.textContent = 'Отправка...';
 
-        await API.createReview(orderId, orderItemId, productId, rating, comment);
+        // Если productId пустой или null, передаем null (продукт мог быть удален)
+        const finalProductId = productId && productId.trim() !== '' ? productId : null;
+        await API.createReview(orderId, orderItemId, finalProductId, rating, comment);
         
         if (typeof Utils !== 'undefined' && Utils.showSuccess) {
           Utils.showSuccess('Отзыв успешно отправлен!');

@@ -55,9 +55,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         restaurantCityElement.textContent = ` ${data.restaurant.city}`;
       }
 
-      // Отобразить баннеры
-      if (data.banners && data.banners.length > 0) {
-        renderBanners(data.banners);
+      // Загрузить и отобразить баннеры через отдельный эндпоинт
+      try {
+        // Определяем язык из браузера или используем 'ru' по умолчанию
+        const browserLang = navigator.language || navigator.userLanguage || 'ru';
+        const lang = browserLang.toLowerCase().startsWith('kk') ? 'kk' : 
+                     browserLang.toLowerCase().startsWith('en') ? 'en' : 'ru';
+        const banners = await API.getBanners(restaurantId, lang);
+        if (banners && banners.length > 0) {
+          renderBanners(banners);
+        }
+      } catch (bannerError) {
+        console.warn('Failed to load banners:', bannerError);
+        // Если не удалось загрузить баннеры через новый эндпоинт, используем старый способ (для обратной совместимости)
+        if (data.banners && data.banners.length > 0) {
+          renderBanners(data.banners);
+        }
       }
 
       // Отобразить категории

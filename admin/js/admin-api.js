@@ -664,6 +664,23 @@ async function adminModerateReview(id, status, moderationComment) {
   });
 }
 
+/**
+ * Получить аналитику дашборда
+ * @param {string} restaurantId - ID ресторана (опционально)
+ * @param {string} dateFrom - Начальная дата (YYYY-MM-DD, опционально)
+ * @param {string} dateTo - Конечная дата (YYYY-MM-DD, опционально)
+ * @returns {Promise<object>}
+ */
+async function adminGetDashboardAnalytics(restaurantId, dateFrom, dateTo) {
+  const params = [];
+  if (restaurantId) params.push(`restaurantId=${encodeURIComponent(restaurantId)}`);
+  if (dateFrom) params.push(`dateFrom=${encodeURIComponent(dateFrom)}`);
+  if (dateTo) params.push(`dateTo=${encodeURIComponent(dateTo)}`);
+  
+  const url = '/admin/analytics/dashboard' + (params.length > 0 ? '?' + params.join('&') : '');
+  return apiRequest(url);
+}
+
 // Экспорт функций
 if (typeof window !== 'undefined') {
   window.AdminAPI = {
@@ -739,6 +756,8 @@ if (typeof window !== 'undefined') {
     getReviews: adminGetReviews,
     getReview: adminGetReview,
     moderateReview: adminModerateReview,
+    // Analytics
+    getDashboardAnalytics: adminGetDashboardAnalytics,
   };
 }
 

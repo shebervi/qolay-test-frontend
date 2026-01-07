@@ -63,6 +63,57 @@
       </header>
 
       <div class="admin-content">
+        <!-- Фильтр по дате -->
+        <div class="dashboard-filter">
+          <label for="date-filter">Дата:</label>
+          <input type="date" id="date-filter" class="date-input">
+          <button class="btn btn-primary" id="apply-filter-btn">Применить</button>
+        </div>
+
+        <!-- Статистика за период -->
+        <div class="dashboard-section">
+          <h3>Статистика за период</h3>
+          <div class="dashboard-grid">
+            <div class="stat-card analytics-card">
+              <div class="stat-icon">
+                <i class="fas fa-shopping-cart"></i>
+              </div>
+              <div class="stat-info">
+                <h4>Количество заказов</h4>
+                <div class="stat-value" id="orders-count">-</div>
+              </div>
+            </div>
+            <div class="stat-card analytics-card">
+              <div class="stat-icon">
+                <i class="fas fa-dollar-sign"></i>
+              </div>
+              <div class="stat-info">
+                <h4>Выручка, KZT</h4>
+                <div class="stat-value" id="revenue">-</div>
+              </div>
+            </div>
+            <div class="stat-card analytics-card">
+              <div class="stat-icon">
+                <i class="fas fa-chart-bar"></i>
+              </div>
+              <div class="stat-info">
+                <h4>Средний чек</h4>
+                <div class="stat-value" id="average-check">-</div>
+              </div>
+            </div>
+            <div class="stat-card analytics-card">
+              <div class="stat-icon">
+                <i class="fas fa-hand-holding-usd"></i>
+              </div>
+              <div class="stat-info">
+                <h4>Чаевые</h4>
+                <div class="stat-value" id="tips">-</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Основная статистика (старая) -->
         <div class="dashboard-grid">
           <div class="stat-card">
             <h3>Рестораны</h3>
@@ -82,6 +133,33 @@
           </div>
         </div>
 
+        <div class="dashboard-layout">
+          <!-- Последние заказы -->
+          <div class="dashboard-section">
+            <h3>Последние заказы</h3>
+            <div id="recent-orders" class="list-container">
+              <div class="loading">Загрузка...</div>
+            </div>
+          </div>
+
+          <!-- QR сканирование -->
+          <div class="dashboard-section">
+            <h3>QR сканирование</h3>
+            <div id="qr-scans-stats" class="qr-scans-container">
+              <div class="loading">Загрузка...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Популярные блюда -->
+        <div class="dashboard-section">
+          <h3>Популярные блюда</h3>
+          <div id="popular-dishes" class="list-container">
+            <div class="loading">Загрузка...</div>
+          </div>
+        </div>
+
+        <!-- Последние рестораны (старая секция) -->
         <div class="dashboard-section">
           <h3>Последние рестораны</h3>
           <div id="recent-restaurants" class="list-container">

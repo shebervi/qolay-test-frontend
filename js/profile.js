@@ -128,7 +128,7 @@ function renderOrderCard(order) {
   const total = parseFloat(order.total_kzt || 0);
   const createdAt = new Date(order.created_at).toLocaleString('ru-RU');
   const restaurantName = order.restaurant?.name || 'Не указан';
-  const tableNumber = order.table?.number || 'Не указан';
+  const tableNumber = order.table?.number || order.snapshot_table_number || 'Не указан';
 
   const itemsHtml = order.items && order.items.length > 0
     ? order.items.map(item => {

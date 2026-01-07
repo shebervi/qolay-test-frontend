@@ -99,8 +99,57 @@ async function setGuests(sessionId, guests) {
  * @returns {Promise<object>}
  */
 async function getMenu(tableToken) {
-  const response = await apiRequest(`/public/menu?table=${encodeURIComponent(tableToken)}`);
+  // Проверяем, было ли уже сканирование этого QR за последний час
+  const now = new Date();
+  const currentHour = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}`;
+  const scanKey = `qr_scan_${tableToken}_${currentHour}`;
+  const hasScannedThisHour = localStorage.getItem(scanKey) === 'true';
+  
+  // Отправляем параметр isFirstScan только если это первое сканирование за этот час
+  const params = new URLSearchParams({
+    table: tableToken,
+  });
+  
+  if (!hasScannedThisHour) {
+    params.append('isFirstScan', 'true');
+  }
+  
+  const response = await apiRequest(`/public/menu?${params.toString()}`);
+  
+  // Если это было первое сканирование, сохраняем в localStorage
+  if (!hasScannedThisHour && response.data) {
+    localStorage.setItem(scanKey, 'true');
+    // Удаляем старые записи (старше 2 часов для безопасности)
+    cleanupOldScanRecords(tableToken);
+  }
+  
   return response.data;
+}
+
+/**
+ * Очистка старых записей о сканированиях из localStorage
+ * @param {string} tableToken - QR токен стола
+ */
+function cleanupOldScanRecords(tableToken) {
+  const now = new Date();
+  const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+  
+  // Удаляем записи старше 2 часов
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith(`qr_scan_${tableToken}_`)) {
+      // Извлекаем дату и час из ключа
+      const match = key.match(/qr_scan_.+_(\d{4}-\d{2}-\d{2}_\d{2})/);
+      if (match) {
+        const [year, month, day, hour] = match[1].split(/[-_]/);
+        const recordDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour));
+        
+        if (recordDate < twoHoursAgo) {
+          localStorage.removeItem(key);
+        }
+      }
+    }
+  }
 }
 
 /**
@@ -184,6 +233,23 @@ async function getRestaurantMenu(restaurantId) {
 }
 
 /**
+ * Получить активные баннеры ресторана (публичный доступ)
+ * @param {string} restaurantId - ID ресторана
+ * @param {string} lang - Язык интерфейса (ru, kk, en). По умолчанию: ru
+ * @returns {Promise<Array>}
+ */
+async function getBanners(restaurantId, lang = 'ru') {
+  const headers = {};
+  if (lang && lang !== 'ru') {
+    headers['Accept-Language'] = lang;
+  }
+  const response = await apiRequest(`/public/banners?restaurantId=${encodeURIComponent(restaurantId)}`, {
+    headers,
+  });
+  return response.data;
+}
+
+/**
  * Создать заказ из корзины
  * @param {string} sessionId - ID сессии корзины
  * @param {string} guestName - Имя гостя
@@ -227,8 +293,10 @@ async function getProductReviews(productId) {
 
 /**
  * Привязать заказ к аккаунту
+ * Привязка происходит автоматически на бэкенде при авторизации для недавних заказов.
+ * Этот метод используется для ручной привязки, если автоматическая не сработала.
  * @param {string} orderId - ID заказа
- * @param {string} claimToken - Токен для привязки заказа (опционально, если не указан, заказ будет привязан автоматически)
+ * @param {string|null} claimToken - Токен для привязки заказа (опционально, обычно не требуется - заказ привязывается автоматически)
  * @returns {Promise<object>}
  */
 async function claimOrder(orderId, claimToken) {
@@ -252,15 +320,21 @@ async function claimOrder(orderId, claimToken) {
  * @returns {Promise<object>}
  */
 async function createReview(orderId, orderItemId, productId, rating, comment) {
+  const body = {
+    order_id: orderId,
+    order_item_id: orderItemId,
+    rating,
+    comment: comment || undefined,
+  };
+  
+  // product_id опциональный - может быть null, если продукт был удален
+  if (productId) {
+    body.product_id = productId;
+  }
+  
   const response = await apiRequest('/reviews', {
     method: 'POST',
-    body: JSON.stringify({
-      order_id: orderId,
-      order_item_id: orderItemId,
-      product_id: productId,
-      rating,
-      comment: comment || undefined,
-    }),
+    body: JSON.stringify(body),
   });
   return response.data;
 }
@@ -319,6 +393,7 @@ if (typeof window !== 'undefined') {
     removeCartItem,
     getAllRestaurants,
     getRestaurantMenu,
+    getBanners,
     createOrder,
     getOrder,
     getProductReviews,

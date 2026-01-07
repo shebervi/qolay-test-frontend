@@ -857,7 +857,7 @@ function renderKanbanCard(order) {
     return `
     <div class="kanban-card" draggable="true" data-order-id="${order.id}" data-current-status="${order.status}">
       <div class="kanban-card-header">
-        <div class="kanban-card-title">Стол № ${order.table?.number || 'N/A'}</div>
+        <div class="kanban-card-title">Стол № ${order.table?.number || order.snapshot_table_number || 'N/A'}</div>
         <div class="kanban-card-icon"><i class="fas fa-shopping-cart"></i></div>
         </div>
       <div class="kanban-card-info">
@@ -962,7 +962,7 @@ async function showOrderDetails(orderId) {
         <div class="order-details-header">
           <div class="order-details-header-left">
             <h3 class="order-details-title">Детали заказа</h3>
-            <div class="order-table-info">Стол № ${order.table?.number || 'N/A'}</div>
+            <div class="order-table-info">Стол № ${order.table?.number || order.snapshot_table_number || 'N/A'}</div>
             <div class="order-date-time">${dateStr} ${timeStr}</div>
             </div>
           <div class="order-details-header-right">
