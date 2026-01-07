@@ -302,10 +302,8 @@ function openQRLink() {
   }
   
   // Формируем URL для меню стола
-  // URL имеет формат: /guests.html?table={qrTokenHash}
-  // Используем тот же origin, что и текущая страница, но заменяем путь
-  const currentOrigin = window.location.origin;
-  const qrUrl = `${currentOrigin}/guests.html?table=${currentQRTokenHash}`;
+  // URL имеет формат: https://qolay-frontend.vercel.app/?table={qrTokenHash}
+  const qrUrl = `https://qolay-frontend.vercel.app/?table=${currentQRTokenHash}`;
   
   // Открываем в новой вкладке
   window.open(qrUrl, '_blank');
