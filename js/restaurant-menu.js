@@ -61,8 +61,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const browserLang = navigator.language || navigator.userLanguage || 'ru';
         const lang = browserLang.toLowerCase().startsWith('kk') ? 'kk' : 
                      browserLang.toLowerCase().startsWith('en') ? 'en' : 'ru';
-        const banners = await API.getBanners(restaurantId, lang);
-        if (banners && banners.length > 0) {
+        const bannersFull = await API.getBanners(restaurantId);
+        if (bannersFull && bannersFull.length > 0) {
+          const banners = adaptBannersForDisplay(bannersFull, lang);
           renderBanners(banners);
         }
       } catch (bannerError) {
@@ -261,6 +262,54 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Кнопка скрытия категорий не нужна в мобильной версии
+
+  /**
+   * Адаптировать полные данные баннеров для отображения
+   * Преобразует BannerResponseDto в формат для renderBanners
+   * Сохраняет все языки для возможности переключения без дополнительных запросов
+   */
+  function adaptBannersForDisplay(bannersFull, lang = 'ru') {
+    return bannersFull.map(banner => {
+      // Выбираем текст на нужном языке для текущего отображения
+      const title = banner[`title${lang.charAt(0).toUpperCase() + lang.slice(1)}`] || banner.titleRu || null;
+      const subtitle = banner[`subtitle${lang.charAt(0).toUpperCase() + lang.slice(1)}`] || banner.subtitleRu || null;
+      
+      // Используем imageUrl из ответа, если есть, иначе формируем сами (для обратной совместимости)
+      const imageUrl = banner.imageUrl || `${CONFIG.API_BASE_URL}/public/banners/${banner.id}/image`;
+      
+      // Формируем объект action
+      const action = {
+        type: banner.actionType,
+        categoryId: banner.targetCategoryId || undefined,
+        productId: banner.targetProductId || undefined,
+        url: banner.targetUrl || undefined,
+      };
+      
+      return {
+        id: banner.id,
+        // Текущий язык для отображения
+        title,
+        subtitle,
+        // Все языки для возможности переключения
+        titleRu: banner.titleRu || null,
+        titleKk: banner.titleKk || null,
+        titleEn: banner.titleEn || null,
+        subtitleRu: banner.subtitleRu || null,
+        subtitleKk: banner.subtitleKk || null,
+        subtitleEn: banner.subtitleEn || null,
+        // Изображение
+        imageUrl,
+        imageKey: banner.imageKey,
+        // Действие
+        action,
+        // Метаданные (если нужны)
+        priority: banner.priority,
+        isActive: banner.isActive,
+        startsAt: banner.startsAt,
+        endsAt: banner.endsAt,
+      };
+    });
+  }
 
   /**
    * Отобразить баннеры

@@ -233,19 +233,12 @@ async function getRestaurantMenu(restaurantId) {
 }
 
 /**
- * Получить активные баннеры ресторана (публичный доступ)
+ * Получить активные баннеры ресторана с полными данными (публичный доступ)
  * @param {string} restaurantId - ID ресторана
- * @param {string} lang - Язык интерфейса (ru, kk, en). По умолчанию: ru
  * @returns {Promise<Array>}
  */
-async function getBanners(restaurantId, lang = 'ru') {
-  const headers = {};
-  if (lang && lang !== 'ru') {
-    headers['Accept-Language'] = lang;
-  }
-  const response = await apiRequest(`/public/banners?restaurantId=${encodeURIComponent(restaurantId)}`, {
-    headers,
-  });
+async function getBanners(restaurantId) {
+  const response = await apiRequest(`/public/banners?restaurantId=${encodeURIComponent(restaurantId)}`);
   return response.data;
 }
 
