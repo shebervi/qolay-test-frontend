@@ -84,6 +84,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         productsList.innerHTML = '<div class="empty-state">Меню пусто</div>';
       }
 
+      // Загрузить социальные ссылки
+      await loadSocialLinks();
+
       loadingIndicator.style.display = 'none';
     } catch (error) {
       loadingIndicator.style.display = 'none';
@@ -520,6 +523,58 @@ document.addEventListener('DOMContentLoaded', async () => {
       default:
         // Ничего не делать
         break;
+    }
+  }
+
+  /**
+   * Загрузить социальные ссылки ресторана
+   */
+  async function loadSocialLinks() {
+    try {
+      // getRestaurantSocialLinks уже возвращает массив ссылок (response.data из API)
+      const links = await API.getRestaurantSocialLinks(restaurantId);
+      
+      // Убеждаемся, что это массив
+      const linksArray = Array.isArray(links) ? links : [];
+      
+      const container = document.getElementById('social-links-container');
+      const list = document.getElementById('social-links-list');
+      
+      if (!container || !list) {
+        console.warn('Social links container not found in DOM');
+        return;
+      }
+      
+      if (linksArray.length === 0) {
+        container.style.display = 'none';
+        return;
+      }
+
+      container.style.display = 'block';
+      
+      list.innerHTML = linksArray.map(link => {
+        const iconUrl = link.icon ? API.getSocialIconUrl(link.icon) : null;
+        const iconHtml = iconUrl 
+          ? `<img src="${iconUrl}" alt="${link.label}" style="width: 24px; height: 24px; object-fit: contain;" onerror="this.style.display='none'">`
+          : '';
+        
+        return `
+          <a href="${link.url}" target="_blank" rel="noopener noreferrer" 
+             style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: #f5f5f5; border-radius: 8px; text-decoration: none; color: var(--primary-color); font-weight: 500; font-size: 14px; transition: all 0.2s;"
+             onmouseover="this.style.background='#e8e8e8'; this.style.transform='translateY(-2px)'"
+             onmouseout="this.style.background='#f5f5f5'; this.style.transform='translateY(0)'">
+            ${iconHtml}
+            <span>${link.label}</span>
+          </a>
+        `;
+      }).join('');
+    } catch (error) {
+      console.error('Failed to load social links:', error);
+      // Не показываем ошибку пользователю, просто скрываем контейнер
+      const container = document.getElementById('social-links-container');
+      if (container) {
+        container.style.display = 'none';
+      }
     }
   }
 

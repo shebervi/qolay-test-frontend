@@ -469,6 +469,141 @@ async function adminUploadBannerImage(id, file) {
 }
 
 /**
+ * Социальные ссылки
+ */
+async function adminGetSocialLinks(restaurantId) {
+  return apiRequest(`/admin/restaurants/${restaurantId}/social-links`);
+}
+
+async function adminGetSocialLink(id) {
+  return apiRequest(`/admin/social-links/${id}`);
+}
+
+async function adminCreateSocialLink(restaurantId, data, iconFile = null) {
+  // Если есть файл иконки, используем FormData
+  if (iconFile) {
+    const formData = new FormData();
+    
+    // Добавляем все поля данных
+    Object.keys(data).forEach(key => {
+      if (data[key] !== undefined && data[key] !== null) {
+        if (key === 'isActive' || key === 'order') {
+          formData.append(key, String(data[key]));
+        } else {
+          formData.append(key, data[key]);
+        }
+      }
+    });
+    
+    // Добавляем файл иконки
+    formData.append('iconFile', iconFile);
+    
+    const headers = {};
+    const token = Auth?.getAuthToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    return fetch(`${CONFIG.API_BASE_URL}/admin/restaurants/${restaurantId}/social-links`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    }).then(async (response) => {
+      if (response.status === 401) {
+        if (typeof Auth !== 'undefined') {
+          Auth.clearAuth();
+          Auth.redirectToLogin();
+        }
+        throw new Error('Сессия истекла. Пожалуйста, войдите снова.');
+      }
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Failed to create social link' }));
+        throw new Error(error.message || 'Failed to create social link');
+      }
+      return response.json();
+    });
+  } else {
+    // Если нет файла, используем обычный JSON запрос
+    return apiRequest(`/admin/restaurants/${restaurantId}/social-links`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+}
+
+async function adminUpdateSocialLink(id, data, iconFile = null) {
+  // Если есть файл иконки, используем FormData
+  if (iconFile) {
+    const formData = new FormData();
+    
+    // Добавляем все поля данных
+    Object.keys(data).forEach(key => {
+      if (data[key] !== undefined && data[key] !== null) {
+        if (key === 'isActive' || key === 'order') {
+          formData.append(key, String(data[key]));
+        } else {
+          formData.append(key, data[key]);
+        }
+      }
+    });
+    
+    // Добавляем файл иконки
+    formData.append('iconFile', iconFile);
+    
+    const headers = {};
+    const token = Auth?.getAuthToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    return fetch(`${CONFIG.API_BASE_URL}/admin/social-links/${id}`, {
+      method: 'PATCH',
+      headers,
+      body: formData,
+    }).then(async (response) => {
+      if (response.status === 401) {
+        if (typeof Auth !== 'undefined') {
+          Auth.clearAuth();
+          Auth.redirectToLogin();
+        }
+        throw new Error('Сессия истекла. Пожалуйста, войдите снова.');
+      }
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Failed to update social link' }));
+        throw new Error(error.message || 'Failed to update social link');
+      }
+      return response.json();
+    });
+  } else {
+    // Если нет файла, используем обычный JSON запрос
+    return apiRequest(`/admin/social-links/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+}
+
+async function adminDeleteSocialLink(id) {
+  return apiRequest(`/admin/social-links/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+async function adminReorderSocialLinks(ids) {
+  return apiRequest(`/admin/social-links/reorder`, {
+    method: 'PATCH',
+    body: JSON.stringify({ ids }),
+  });
+}
+
+// Функция удалена - загрузка иконки теперь происходит прямо при создании/обновлении социальной ссылки
+
+function getSocialIconUrl(iconKey) {
+  if (!iconKey) return null;
+  return `${CONFIG.API_BASE_URL}/admin/social-links/icons/${iconKey}`;
+}
+
+/**
  * Заказы
  */
 async function adminGetOrders(filters = {}) {
@@ -758,6 +893,14 @@ if (typeof window !== 'undefined') {
     moderateReview: adminModerateReview,
     // Analytics
     getDashboardAnalytics: adminGetDashboardAnalytics,
+    // Социальные ссылки
+    getSocialLinks: adminGetSocialLinks,
+    getSocialLink: adminGetSocialLink,
+    createSocialLink: adminCreateSocialLink,
+    updateSocialLink: adminUpdateSocialLink,
+    deleteSocialLink: adminDeleteSocialLink,
+    reorderSocialLinks: adminReorderSocialLinks,
+    getSocialIconUrl: getSocialIconUrl,
   };
 }
 

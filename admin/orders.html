@@ -39,11 +39,17 @@
         <a href="banners.html" class="nav-item" data-page="banners">
           <i class="fas fa-bullseye"></i> Баннеры
         </a>
+        <a href="social-links.html" class="nav-item" data-page="social-links">
+          <i class="fas fa-share-alt"></i> Социальные ссылки
+        </a>
         <a href="images.html" class="nav-item" data-page="images">
           <i class="fas fa-images"></i> Изображения
         </a>
         <a href="orders.html" class="nav-item active" data-page="orders">
           <i class="fas fa-box"></i> Заказы
+        </a>
+        <a href="reviews.html" class="nav-item" data-page="reviews">
+          <i class="fas fa-star"></i> Отзывы
         </a>
       </nav>
     </aside>
@@ -230,6 +236,10 @@
   <script src="../js/auth.js"></script>
   <script src="js/admin-auth.js"></script>
   <script src="js/admin-api.js"></script>
+  <!-- Socket.io client library -->
+  <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
+  <!-- WebSocket client for orders -->
+  <script src="js/orders-websocket.js"></script>
   <script src="js/orders.js"></script>
 </body>
 </html>

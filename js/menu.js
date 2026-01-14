@@ -14,15 +14,29 @@ let searchQuery = '';
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', async () => {
-  // Проверяем наличие сессии
+  // Получаем токен из URL или из localStorage
+  const urlParams = new URLSearchParams(window.location.search);
+  const tableTokenFromUrl = urlParams.get('table');
+  const tableTokenFromStorage = Utils.getTableTokenFromStorage();
+  
+  // Если токен есть в URL, но не сохранен в localStorage, сохраняем его
+  if (tableTokenFromUrl && !tableTokenFromStorage) {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.TABLE_TOKEN, tableTokenFromUrl);
+  }
+  
+  const tableToken = tableTokenFromUrl || tableTokenFromStorage;
   const sessionId = Utils.getSession();
-  const tableToken = Utils.getTableTokenFromStorage();
 
+  // Если нет сессии или токена - редиректим на guests.html
   if (!sessionId || !tableToken) {
-    Utils.showError('Сессия не найдена. Пожалуйста, начните с выбора количества гостей.');
-    setTimeout(() => {
-      Utils.navigateToGuests(tableToken);
-    }, 2000);
+    if (tableToken) {
+      window.location.href = `guests.html?table=${tableToken}`;
+    } else {
+      Utils.showError('Сессия не найдена. Пожалуйста, начните с выбора количества гостей.');
+      setTimeout(() => {
+        window.location.href = 'index.html';
+      }, 2000);
+    }
     return;
   }
 
@@ -81,6 +95,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Отобразить продукты первой категории
     if (menu.categories.length > 0) {
       selectCategory(menu.categories[0].id);
+    }
+
+    // Загрузить социальные ссылки
+    if (menu.restaurant && menu.restaurant.id) {
+      await loadSocialLinks(menu.restaurant.id);
     }
 
     loadingIndicator.style.display = 'none';
@@ -603,6 +622,58 @@ document.addEventListener('DOMContentLoaded', async () => {
       default:
         // Ничего не делать
         break;
+    }
+  }
+
+  /**
+   * Загрузить социальные ссылки ресторана
+   */
+  async function loadSocialLinks(restaurantId) {
+    try {
+      // getRestaurantSocialLinks уже возвращает массив ссылок (response.data из API)
+      const links = await API.getRestaurantSocialLinks(restaurantId);
+      
+      // Убеждаемся, что это массив
+      const linksArray = Array.isArray(links) ? links : [];
+      
+      const container = document.getElementById('social-links-container');
+      const list = document.getElementById('social-links-list');
+      
+      if (!container || !list) {
+        console.warn('Social links container not found in DOM');
+        return;
+      }
+      
+      if (linksArray.length === 0) {
+        container.style.display = 'none';
+        return;
+      }
+
+      container.style.display = 'block';
+      
+      list.innerHTML = linksArray.map(link => {
+        const iconUrl = link.icon ? API.getSocialIconUrl(link.icon) : null;
+        const iconHtml = iconUrl 
+          ? `<img src="${iconUrl}" alt="${link.label}" style="width: 24px; height: 24px; object-fit: contain;" onerror="this.style.display='none'">`
+          : '';
+        
+        return `
+          <a href="${link.url}" target="_blank" rel="noopener noreferrer" 
+             style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: #f5f5f5; border-radius: 8px; text-decoration: none; color: var(--primary-color); font-weight: 500; font-size: 14px; transition: all 0.2s;"
+             onmouseover="this.style.background='#e8e8e8'; this.style.transform='translateY(-2px)'"
+             onmouseout="this.style.background='#f5f5f5'; this.style.transform='translateY(0)'">
+            ${iconHtml}
+            <span>${link.label}</span>
+          </a>
+        `;
+      }).join('');
+    } catch (error) {
+      console.error('Failed to load social links:', error);
+      // Не показываем ошибку пользователю, просто скрываем контейнер
+      const container = document.getElementById('social-links-container');
+      if (container) {
+        container.style.display = 'none';
+      }
     }
   }
 

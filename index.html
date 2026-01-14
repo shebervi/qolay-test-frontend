@@ -255,6 +255,7 @@
     const tableToken = urlParams.get('table');
     
     if (tableToken) {
+      // Редиректим на guests.html для выбора количества гостей
       window.location.href = `guests.html?table=${tableToken}`;
     }
     

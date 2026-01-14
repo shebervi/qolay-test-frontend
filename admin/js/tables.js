@@ -302,8 +302,12 @@ function openQRLink() {
   }
   
   // Формируем URL для меню стола
-  // URL имеет формат: https://qolay-frontend.vercel.app/?table={qrTokenHash}
-  const qrUrl = `https://qolay-frontend.vercel.app/?table=${currentQRTokenHash}`;
+  // В dev режиме используем localhost, в продакшне - прод URL
+  const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const frontendUrl = isDevelopment 
+    ? 'http://localhost:3000' 
+    : 'https://qolay-frontend.vercel.app';
+  const qrUrl = `${frontendUrl}/?table=${currentQRTokenHash}`;
   
   // Открываем в новой вкладке
   window.open(qrUrl, '_blank');

@@ -232,6 +232,18 @@ async function getRestaurantMenu(restaurantId) {
   return response.data;
 }
 
+async function getRestaurantSocialLinks(restaurantId) {
+  const response = await apiRequest(`/public/restaurants/${restaurantId}/social-links`);
+  return response.data;
+}
+
+function getSocialIconUrl(iconKey) {
+  if (!iconKey) return null;
+  // URL-кодируем iconKey, чтобы правильно обработать пути с слешами (например, default/instagram.svg)
+  const encodedIconKey = encodeURIComponent(iconKey).replace(/%2F/g, '/');
+  return `${CONFIG.API_BASE_URL}/admin/social-links/icons/${encodedIconKey}`;
+}
+
 /**
  * Получить активные баннеры ресторана с полными данными (публичный доступ)
  * @param {string} restaurantId - ID ресторана
@@ -386,6 +398,8 @@ if (typeof window !== 'undefined') {
     removeCartItem,
     getAllRestaurants,
     getRestaurantMenu,
+  getRestaurantSocialLinks,
+  getSocialIconUrl,
     getBanners,
     createOrder,
     getOrder,

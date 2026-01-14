@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Test - Order Notifications</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .status-bar {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        .status-indicator.connected {
+            background: #4caf50;
+        }
+
+        .status-indicator.disconnected {
+            background: #f44336;
+        }
+
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #7c3aed;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            margin-right: 10px;
+        }
+
+        button:hover {
+            background: #6d28d9;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .events-log {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .events-log h2 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .event-item {
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            border-left: 4px solid;
+            background: #f9f9f9;
+        }
+
+        .event-item.created {
+            border-left-color: #4caf50;
+        }
+
+        .event-item.status_changed {
+            border-left-color: #ff9800;
+        }
+
+        .event-item.updated {
+            border-left-color: #2196f3;
+        }
+
+        .event-time {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 5px;
+        }
+
+        .event-type {
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        .event-data {
+            font-size: 13px;
+            color: #666;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+        }
+
+        .clear-button {
+            background: #f44336;
+            float: right;
+        }
+
+        .clear-button:hover {
+            background: #d32f2f;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WebSocket Order Notifications - Test Page</h1>
+
+        <div class="status-bar">
+            <span class="status-indicator disconnected" id="statusIndicator"></span>
+            <span id="statusText">Disconnected</span>
+            <span style="margin-left: 20px; color: #999;" id="socketId"></span>
+        </div>
+
+        <div class="controls">
+            <div class="form-group">
+                <label for="serverUrl">Server URL:</label>
+                <input type="text" id="serverUrl" value="http://localhost:3000" placeholder="http://localhost:3000">
+            </div>
+
+            <div class="form-group">
+                <label for="restaurantId">Restaurant ID:</label>
+                <input type="text" id="restaurantId" placeholder="Enter restaurant UUID">
+            </div>
+
+            <button id="connectBtn">Connect</button>
+            <button id="disconnectBtn" disabled>Disconnect</button>
+            <button id="subscribeBtn" disabled>Subscribe to Restaurant</button>
+        </div>
+
+        <div class="events-log">
+            <h2>
+                Events Log
+                <button class="clear-button" id="clearBtn">Clear</button>
+            </h2>
+            <div id="eventsList"></div>
+        </div>
+    </div>
+
+    <!-- Socket.io client library -->
+    <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
+    
+    <!-- Our WebSocket client -->
+    <script src="/admin/js/orders-websocket.js"></script>
+
+    <script>
+        let ordersWS = null;
+
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const socketId = document.getElementById('socketId');
+        const eventsList = document.getElementById('eventsList');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const subscribeBtn = document.getElementById('subscribeBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const serverUrlInput = document.getElementById('serverUrl');
+        const restaurantIdInput = document.getElementById('restaurantId');
+
+        // Update UI status
+        function updateStatus(connected, id = '') {
+            if (connected) {
+                statusIndicator.className = 'status-indicator connected';
+                statusText.textContent = 'Connected';
+                socketId.textContent = `Socket ID: ${id}`;
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                subscribeBtn.disabled = false;
+            } else {
+                statusIndicator.className = 'status-indicator disconnected';
+                statusText.textContent = 'Disconnected';
+                socketId.textContent = '';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                subscribeBtn.disabled = true;
+            }
+        }
+
+        // Add event to log
+        function addEventToLog(type, data) {
+            const eventItem = document.createElement('div');
+            eventItem.className = `event-item ${type}`;
+            
+            const time = new Date().toLocaleTimeString();
+            const eventType = type === 'created' ? 'order.created' : 
+                             type === 'status_changed' ? 'order.status_changed' : 
+                             'order.updated';
+            
+            eventItem.innerHTML = `
+                <div class="event-time">${time}</div>
+                <div class="event-type">${eventType}</div>
+                <div class="event-data">${JSON.stringify(data, null, 2)}</div>
+            `;
+            
+            eventsList.insertBefore(eventItem, eventsList.firstChild);
+        }
+
+        // Connect button handler
+        connectBtn.addEventListener('click', () => {
+            const serverUrl = serverUrlInput.value.trim();
+            const restaurantId = restaurantIdInput.value.trim();
+
+            if (!serverUrl) {
+                alert('Please enter server URL');
+                return;
+            }
+
+            ordersWS = new OrdersWebSocket(serverUrl, {
+                restaurantId: restaurantId || null,
+                onConnect: () => {
+                    const socket = ordersWS.getSocket();
+                    updateStatus(true, socket.id);
+                    console.log('Connected to WebSocket server');
+                },
+                onDisconnect: (reason) => {
+                    updateStatus(false);
+                    console.log('Disconnected from WebSocket server:', reason);
+                },
+                onOrderCreated: (data) => {
+                    addEventToLog('created', data);
+                },
+                onOrderStatusChanged: (data) => {
+                    addEventToLog('status_changed', data);
+                },
+                onOrderUpdated: (data) => {
+                    addEventToLog('updated', data);
+                },
+                onError: (error) => {
+                    console.error('WebSocket error:', error);
+                    alert('WebSocket error: ' + error.message);
+                }
+            });
+        });
+
+        // Disconnect button handler
+        disconnectBtn.addEventListener('click', () => {
+            if (ordersWS) {
+                ordersWS.disconnect();
+                ordersWS = null;
+            }
+        });
+
+        // Subscribe button handler
+        subscribeBtn.addEventListener('click', () => {
+            const restaurantId = restaurantIdInput.value.trim();
+            
+            if (!restaurantId) {
+                alert('Please enter restaurant ID');
+                return;
+            }
+
+            if (ordersWS) {
+                ordersWS.subscribeToRestaurant(restaurantId);
+            }
+        });
+
+        // Clear button handler
+        clearBtn.addEventListener('click', () => {
+            eventsList.innerHTML = '';
+        });
+
+        // Load restaurant ID from localStorage if available
+        const savedRestaurantId = localStorage.getItem('testRestaurantId');
+        if (savedRestaurantId) {
+            restaurantIdInput.value = savedRestaurantId;
+        }
+
+        // Save restaurant ID to localStorage on change
+        restaurantIdInput.addEventListener('change', () => {
+            const restaurantId = restaurantIdInput.value.trim();
+            if (restaurantId) {
+                localStorage.setItem('testRestaurantId', restaurantId);
+            }
+        });
+    </script>
+</body>
+</html>

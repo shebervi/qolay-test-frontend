@@ -15,6 +15,7 @@ let filterState = {
   dateFrom: null,
   dateTo: null,
 };
+let ordersWebSocket = null;
 
 const ORDER_STATUSES = [
   'DRAFT',
@@ -73,6 +74,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupFilters();
   initDatePicker();
   initKanbanDragAndDrop();
+  initWebSocket();
 });
 
 /**
@@ -158,12 +160,14 @@ async function updateOrderStatusDirect(orderId, newStatus) {
     await AdminAPI.updateOrderStatus(orderId, newStatus);
     Utils.showSuccess('Статус заказа обновлен');
     
-    // Перезагружаем заказы для обновления канбан-доски
-    await loadOrders();
+    // WebSocket обновит UI автоматически, но если WebSocket не подключен, перезагружаем
+    if (!ordersWebSocket || !ordersWebSocket.isSocketConnected()) {
+      await loadOrders();
+    }
   } catch (error) {
     console.error('Failed to update order status:', error);
     Utils.showError(error.message || 'Не удалось обновить статус заказа');
-    // Перезагружаем заказы в случае ошибки
+    // В случае ошибки всегда перезагружаем
     await loadOrders();
   }
 }
@@ -175,6 +179,12 @@ async function loadRestaurants() {
   try {
     const response = await AdminAPI.getRestaurants();
     restaurants = response.data?.data || response.data || [];
+    
+    // Если WebSocket уже подключен, обновляем подписки через updateWebSocketFilters
+    // Это гарантирует единообразную логику подписки и применение фильтров
+    if (ordersWebSocket && ordersWebSocket.isSocketConnected()) {
+      updateWebSocketFilters();
+    }
   } catch (error) {
     console.error('Failed to load restaurants:', error);
     Utils.showError('Не удалось загрузить рестораны');
@@ -498,6 +508,7 @@ function toggleTableFilter(tableNum) {
     filterState.tables.push(tableNum);
   }
   updateFilterBadges();
+  updateWebSocketFilters(); // Обновляем фильтры WebSocket
   loadOrders();
 }
 
@@ -513,6 +524,7 @@ function toggleAmountFilter(min, max) {
     filterState.amountRanges.push(range);
   }
   updateFilterBadges();
+  updateWebSocketFilters(); // Обновляем фильтры WebSocket
   loadOrders();
 }
 
@@ -555,6 +567,7 @@ function toggleOrderStatus(status) {
     filterState.orderStatuses.push(status);
   }
   updateFilterBadges();
+  updateWebSocketFilters(); // Обновляем фильтры WebSocket
   loadOrders();
 }
 
@@ -574,6 +587,7 @@ function clearAllFilters() {
   selectedDateRange = { from: null, to: null };
   updateDateRangeInput();
   updateFilterBadges();
+  updateWebSocketFilters(); // Обновляем фильтры WebSocket
   renderFilterOptions(currentFilterCategory);
   loadOrders();
 }
@@ -1065,7 +1079,11 @@ async function updateOrderStatus(orderId, selectId, options = {}) {
   try {
     await AdminAPI.updateOrderStatus(orderId, status);
     Utils.showSuccess('Статус обновлен');
-    await loadOrders();
+    
+    // WebSocket обновит UI автоматически
+    if (!ordersWebSocket || !ordersWebSocket.isSocketConnected()) {
+      await loadOrders();
+    }
 
     if (options.refreshModal) {
       await showOrderDetails(orderId);
@@ -1073,6 +1091,8 @@ async function updateOrderStatus(orderId, selectId, options = {}) {
   } catch (error) {
     console.error('Failed to update order status:', error);
     Utils.showError('Не удалось обновить статус: ' + error.message);
+    // В случае ошибки перезагружаем
+    await loadOrders();
   }
 }
 
@@ -1098,10 +1118,15 @@ async function markOrderAsPaid(orderId) {
     await AdminAPI.updateOrderStatus(orderId, 'PAID');
     Utils.showSuccess('Заказ отмечен как оплаченный');
     closeOrderModal();
-    await loadOrders();
+    
+    // WebSocket обновит UI автоматически
+    if (!ordersWebSocket || !ordersWebSocket.isSocketConnected()) {
+      await loadOrders();
+    }
   } catch (error) {
     console.error('Failed to mark order as paid:', error);
     Utils.showError(error.message || 'Не удалось обновить статус заказа');
+    await loadOrders();
   }
 }
 
@@ -1138,8 +1163,10 @@ async function updateOrderStatusFromModal(orderId, selectId) {
     // Обновляем текущий статус в select
     select.dataset.currentStatus = newStatus;
     
-    // Обновляем список заказов
-    await loadOrders();
+    // WebSocket обновит UI автоматически, но если WebSocket не подключен, перезагружаем
+    if (!ordersWebSocket || !ordersWebSocket.isSocketConnected()) {
+      await loadOrders();
+    }
   } catch (error) {
     console.error('Failed to update order status:', error);
     Utils.showError('Не удалось обновить статус: ' + (error.message || 'Неизвестная ошибка'));
@@ -1163,6 +1190,270 @@ function toggleOrderItem(orderId, itemId, isChecked) {
   console.log(`Toggle item ${itemId} in order ${orderId} to ${isChecked}`);
   // Пока просто логируем, можно добавить API вызов если нужно
 }
+
+// Кэш текущих фильтров для предотвращения лишних переподписок
+let currentWebSocketFilters = null;
+
+/**
+ * Обновить фильтры WebSocket подписки
+ */
+function updateWebSocketFilters() {
+  if (!ordersWebSocket || !ordersWebSocket.isSocketConnected()) {
+    return;
+  }
+
+  // Не подписываемся, если ресторанов еще нет
+  if (!restaurants || restaurants.length === 0) {
+    return;
+  }
+
+  // Собираем фильтры для подписки
+  const filters = {
+    statuses: filterState.orderStatuses.length > 0 ? filterState.orderStatuses : undefined,
+    tableNumbers: filterState.tables.length > 0 ? filterState.tables : undefined,
+  };
+
+  // Если есть фильтры по сумме, добавляем их
+  if (filterState.amountRanges.length > 0) {
+    const minAmount = Math.min(...filterState.amountRanges.map(r => r.min));
+    const maxAmount = Math.max(...filterState.amountRanges.map(r => r.max !== null ? r.max : Infinity));
+    if (minAmount > 0) filters.minAmount = minAmount;
+    if (maxAmount !== Infinity) filters.maxAmount = maxAmount;
+  }
+
+  // Проверяем, изменились ли фильтры
+  const filtersChanged = JSON.stringify(currentWebSocketFilters) !== JSON.stringify(filters);
+  if (!filtersChanged && currentWebSocketFilters !== null) {
+    // Фильтры не изменились, не нужно переподписываться
+    return;
+  }
+
+  // Сохраняем текущие фильтры
+  currentWebSocketFilters = filters;
+
+  // Обновляем подписки для всех ресторанов
+  restaurants.forEach(restaurant => {
+    const hasFilters = filters.statuses || filters.tableNumbers || filters.minAmount !== undefined || filters.maxAmount !== undefined;
+    ordersWebSocket.subscribeToRestaurant(restaurant.id, hasFilters ? filters : null);
+  });
+}
+
+/**
+ * Инициализация WebSocket для live-обновлений заказов
+ */
+function initWebSocket() {
+  // Проверяем, что OrdersWebSocket доступен
+  if (typeof OrdersWebSocket === 'undefined') {
+    console.warn('OrdersWebSocket not loaded, skipping WebSocket initialization');
+    return;
+  }
+
+  const serverUrl = CONFIG?.API_BASE_URL || window.location.origin;
+  
+  // Подписываемся на все рестораны из списка
+  const restaurantIds = restaurants.map(r => r.id);
+  
+  if (restaurantIds.length === 0) {
+    console.warn('No restaurants available for WebSocket subscription, will subscribe after restaurants are loaded');
+  }
+
+  ordersWebSocket = new OrdersWebSocket(serverUrl, {
+    onConnect: () => {
+      console.log('WebSocket connected for orders');
+      
+      // Подписываемся на все рестораны с текущими фильтрами
+      // updateWebSocketFilters() сама подписывается на все рестораны в цикле
+      if (ordersWebSocket && ordersWebSocket.isSocketConnected()) {
+        updateWebSocketFilters();
+      }
+    },
+    onDisconnect: (reason) => {
+      console.log('WebSocket disconnected:', reason);
+    },
+    onOrderCreated: async (data) => {
+      console.log('New order created:', data);
+      
+      // Формируем объект заказа для проверки фильтров
+      const orderData = {
+        id: data.order_id,
+        status: data.status,
+        restaurant_id: data.restaurant_id,
+        snapshot_table_number: data.snapshot_table_number,
+        total_kzt: data.total_kzt,
+        created_at: data.created_at,
+      };
+      
+      // Если заказ соответствует текущим фильтрам, добавляем его
+      if (shouldShowOrder(orderData)) {
+        // Загружаем полную информацию о заказе
+        try {
+          const response = await AdminAPI.getOrder(data.order_id);
+          const fullOrder = response.data;
+          
+          // Добавляем заказ в начало списка (новые сверху)
+          orders.unshift(fullOrder);
+          
+          // Обновляем UI
+          renderOrders(orders);
+          Utils.showSuccess(`Новый заказ #${data.order_number} со стола ${data.snapshot_table_number || 'N/A'}`);
+        } catch (error) {
+          console.error('Failed to load new order details:', error);
+          // Если не удалось загрузить детали, просто обновляем список
+          await loadOrders();
+        }
+      }
+    },
+    onOrderStatusChanged: async (data) => {
+      console.log('Order status changed:', data);
+      
+      // Находим заказ в текущем списке
+      const orderIndex = orders.findIndex(o => o.id === data.order_id);
+      
+      if (orderIndex !== -1) {
+        // Обновляем статус заказа
+        orders[orderIndex].status = data.new_status;
+        orders[orderIndex].updated_at = data.updated_at;
+        
+        // Обновляем UI без полной перезагрузки
+        renderOrders(orders);
+        
+        // Если модальное окно открыто для этого заказа, обновляем его
+        const modal = document.getElementById('order-modal');
+        if (modal && modal.style.display !== 'none') {
+          const orderDetails = document.getElementById('order-details');
+          const orderIdInModal = orderDetails?.querySelector('[data-order-id]')?.dataset?.orderId;
+          if (orderIdInModal === data.order_id) {
+            await showOrderDetails(data.order_id);
+          }
+        }
+      } else {
+        // Заказ не найден в списке, возможно он был отфильтрован
+        // Перезагружаем список если заказ соответствует фильтрам
+        const orderData = {
+          id: data.order_id,
+          status: data.new_status,
+          restaurant_id: data.restaurant_id,
+          snapshot_table_number: null,
+          total_kzt: null,
+          created_at: data.updated_at,
+        };
+        if (shouldShowOrder(orderData)) {
+          await loadOrders();
+        }
+      }
+    },
+    onOrderUpdated: async (data) => {
+      console.log('Order updated:', data);
+      
+      // Находим заказ и обновляем его
+      const orderIndex = orders.findIndex(o => o.id === data.order_id);
+      
+      if (orderIndex !== -1) {
+        // Загружаем обновленную информацию о заказе
+        try {
+          const response = await AdminAPI.getOrder(data.order_id);
+          orders[orderIndex] = response.data;
+          
+          // Обновляем UI
+          renderOrders(orders);
+        } catch (error) {
+          console.error('Failed to load updated order:', error);
+          // Если не удалось загрузить, просто обновляем статус
+          orders[orderIndex].status = data.status;
+          orders[orderIndex].updated_at = data.updated_at;
+          renderOrders(orders);
+        }
+      } else {
+        // Заказ не найден, проверяем фильтры
+        const orderData = {
+          id: data.order_id,
+          status: data.status,
+          restaurant_id: data.restaurant_id,
+          snapshot_table_number: null,
+          total_kzt: null,
+          created_at: data.updated_at,
+        };
+        if (shouldShowOrder(orderData)) {
+          // Заказ соответствует фильтрам - перезагружаем
+          await loadOrders();
+        }
+      }
+    },
+    onError: (error) => {
+      console.error('WebSocket error:', error);
+    }
+  });
+}
+
+/**
+ * Проверить, должен ли заказ отображаться с учетом текущих фильтров
+ */
+function shouldShowOrder(orderData) {
+  // Если нет активных фильтров, показываем все заказы
+  const hasActiveFilters = 
+    filterState.tables.length > 0 ||
+    filterState.amountRanges.length > 0 ||
+    filterState.paymentStatus.length > 0 ||
+    filterState.paymentMethods.length > 0 ||
+    filterState.orderStatuses.length > 0 ||
+    filterState.dateFrom ||
+    filterState.dateTo;
+  
+  if (!hasActiveFilters) {
+    return true;
+  }
+  
+  // Проверяем фильтры
+  const filters = buildFiltersFromState();
+  
+  // Проверка по статусу
+  if (filters.status) {
+    const statuses = Array.isArray(filters.status) ? filters.status : [filters.status];
+    const orderStatus = orderData.status || orderData.new_status;
+    if (!statuses.includes(orderStatus)) {
+      return false;
+    }
+  }
+  
+  // Проверка по номеру стола
+  if (filters.tableNumber) {
+    const tables = Array.isArray(filters.tableNumber) ? filters.tableNumber : [filters.tableNumber];
+    const tableNum = orderData.snapshot_table_number || orderData.table?.number;
+    if (tableNum && !tables.includes(tableNum)) {
+      return false;
+    }
+  }
+  
+  // Проверка по сумме
+  if (filters.minAmount || filters.maxAmount) {
+    const total = parseFloat(orderData.total_kzt || 0);
+    if (filters.minAmount && total < filters.minAmount) return false;
+    if (filters.maxAmount && total > filters.maxAmount) return false;
+  }
+  
+  // Проверка по дате
+  if (filters.dateFrom || filters.dateTo) {
+    const orderDate = new Date(orderData.created_at || orderData.updated_at);
+    if (filters.dateFrom) {
+      const fromDate = new Date(filters.dateFrom);
+      if (orderDate < fromDate) return false;
+    }
+    if (filters.dateTo) {
+      const toDate = new Date(filters.dateTo);
+      toDate.setHours(23, 59, 59, 999);
+      if (orderDate > toDate) return false;
+    }
+  }
+  
+  return true;
+}
+
+// Очистка WebSocket при закрытии страницы
+window.addEventListener('beforeunload', () => {
+  if (ordersWebSocket) {
+    ordersWebSocket.disconnect();
+  }
+});
 
 // Экспорт функций для использования в HTML
 window.handleDragStart = handleDragStart;
