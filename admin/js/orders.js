@@ -158,7 +158,6 @@ function handleDrop(e) {
 async function updateOrderStatusDirect(orderId, newStatus) {
   try {
     await AdminAPI.updateOrderStatus(orderId, newStatus);
-    Utils.showSuccess('Статус заказа обновлен');
     
     // WebSocket обновит UI автоматически, но если WebSocket не подключен, перезагружаем
     if (!ordersWebSocket || !ordersWebSocket.isSocketConnected()) {
@@ -1160,7 +1159,6 @@ async function updateOrderStatusFromModal(orderId, selectId) {
     }
 
     await AdminAPI.updateOrderStatus(orderId, newStatus);
-    Utils.showSuccess('Статус заказа обновлен');
     
     // Обновляем текущий статус в select
     select.dataset.currentStatus = newStatus;
