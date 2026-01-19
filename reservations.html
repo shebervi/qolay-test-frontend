@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Бронирование стола - QolayKZ</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .reservations-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .reservation-card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .reservation-card h2 {
+      margin: 0 0 20px 0;
+      color: #333;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .form-group select,
+    .form-group input,
+    .form-group textarea {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 16px;
+      font-family: inherit;
+    }
+
+    .form-group textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: var(--primary-color, #ff6b35);
+    }
+
+    .tables-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .table-item {
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .table-item:hover:not(.table-unavailable) {
+      border-color: var(--primary-color, #ff6b35);
+      box-shadow: 0 4px 12px rgba(255, 107, 53, 0.2);
+    }
+
+    .table-item.table-selected {
+      border-color: var(--primary-color, #ff6b35);
+      background: rgba(255, 107, 53, 0.1);
+    }
+
+    .table-item.table-unavailable {
+      opacity: 0.5;
+      cursor: not-allowed;
+      background: #f5f5f5;
+    }
+
+    .table-number {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--primary-color, #ff6b35);
+      margin-bottom: 8px;
+    }
+
+    .table-status {
+      font-size: 12px;
+      color: #666;
+    }
+
+    .info-box {
+      background: #f0f8ff;
+      border-left: 4px solid #2196F3;
+      padding: 16px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+
+    .info-box i {
+      color: #2196F3;
+      margin-right: 8px;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+
+    .error-message {
+      background: #fee;
+      border: 1px solid #fcc;
+      border-radius: 8px;
+      padding: 16px;
+      color: #c33;
+      margin-bottom: 16px;
+    }
+
+    .success-message {
+      background: #efe;
+      border: 1px solid #cfc;
+      border-radius: 8px;
+      padding: 16px;
+      color: #3c3;
+      margin-bottom: 16px;
+    }
+
+    .btn-submit {
+      width: 100%;
+      padding: 16px;
+      background: var(--primary-color, #ff6b35);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 18px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    .btn-submit:hover:not(:disabled) {
+      background: #e5521f;
+    }
+
+    .btn-submit:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <div class="page-container">
+    <header class="header">
+      <div class="header-content">
+        <div class="header-title">Бронирование стола</div>
+        <div class="header-actions">
+          <a href="index.html" class="btn btn-secondary" style="padding: 8px 16px;">
+            <i class="fas fa-home"></i> Главная
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <div class="container reservations-container">
+      <div id="error-message" class="error-message" style="display: none;"></div>
+      <div id="success-message" class="success-message" style="display: none;"></div>
+
+      <div class="reservation-card">
+        <h2><i class="fas fa-calendar-check"></i> Забронировать стол</h2>
+
+        <div class="info-box">
+          <i class="fas fa-info-circle"></i>
+          <strong>Важно:</strong> Бронь требует подтверждения от ресторана. После создания брони с вами свяжутся для подтверждения.
+          Бронь действует до момента завершения персоналом.
+        </div>
+
+        <form id="reservation-form">
+          <!-- Выбор ресторана -->
+          <div class="form-group">
+            <label for="restaurant-select">
+              <i class="fas fa-utensils"></i> Выберите ресторан *
+            </label>
+            <select id="restaurant-select" required>
+              <option value="">Загрузка...</option>
+            </select>
+          </div>
+
+          <!-- Дата и время -->
+          <div class="form-group">
+            <label for="reservation-datetime">
+              <i class="fas fa-calendar"></i> Дата и время *
+            </label>
+            <input type="datetime-local" id="reservation-datetime" required>
+          </div>
+
+          <!-- Количество гостей -->
+          <div class="form-group">
+            <label for="guests-count">
+              <i class="fas fa-users"></i> Количество гостей *
+            </label>
+            <input type="number" id="guests-count" min="1" max="20" value="2" required>
+          </div>
+
+          <!-- Выбор стола -->
+          <div id="tables-section" style="display: none;">
+            <div class="form-group">
+              <label>
+                <i class="fas fa-chair"></i> Выберите стол *
+              </label>
+              <div id="tables-loading" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Загрузка столов...</p>
+              </div>
+              <div id="tables-grid" class="tables-grid">
+                <!-- Столы будут загружены через JS -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Комментарий -->
+          <div class="form-group">
+            <label for="comment">
+              <i class="fas fa-comment"></i> Комментарий (необязательно)
+            </label>
+            <textarea id="comment" placeholder="Особые пожелания, например: у окна, в отдельной комнате и т.д."></textarea>
+          </div>
+
+          <!-- Кнопка отправки -->
+          <button type="submit" class="btn-submit" id="submit-btn" disabled>
+            <i class="fas fa-check"></i> Забронировать
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/reservations.js"></script>
+</body>
+</html>

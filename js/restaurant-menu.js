@@ -11,7 +11,7 @@
 let menuData = null;
 let currentCategoryId = null;
 let searchQuery = '';
-let restaurantId = null;
+let restaurantId = null; // Глобальная переменная для использования в функциях бронирования
 
 document.addEventListener('DOMContentLoaded', async () => {
   // Получить restaurantId из URL
@@ -581,4 +581,207 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Загрузить меню при инициализации
   await loadMenu();
 });
+
+// ===== Функции для бронирования столов =====
+
+let selectedTableId = null;
+let availableTables = [];
+
+/**
+ * Открыть модальное окно бронирования
+ */
+function openReservationModal() {
+  const modal = document.getElementById('reservation-modal');
+  const authCheck = document.getElementById('reservation-auth-check');
+  const form = document.getElementById('reservation-form');
+  const success = document.getElementById('reservation-success');
+
+  modal.classList.add('active');
+
+  // Закрытие при клике вне модального окна
+  modal.addEventListener('click', function(e) {
+    if (e.target === modal) {
+      closeReservationModal();
+    }
+  });
+
+  // Проверяем авторизацию
+  if (typeof Auth === 'undefined' || !Auth.isAuthenticated()) {
+    // Показываем сообщение об авторизации
+    authCheck.style.display = 'block';
+    form.style.display = 'none';
+    success.style.display = 'none';
+
+    // Обновляем ссылку для редиректа
+    const loginLink = document.getElementById('reservation-login-link');
+    if (loginLink && restaurantId) {
+      const currentUrl = `restaurant-menu.html?restaurantId=${restaurantId}`;
+      loginLink.href = `user-login.html?redirect=${encodeURIComponent(currentUrl)}`;
+    }
+    return;
+  }
+
+  // Пользователь авторизован - показываем форму
+  authCheck.style.display = 'none';
+  form.style.display = 'block';
+  success.style.display = 'none';
+
+  // Устанавливаем минимальную дату (текущая + 15 минут)
+  const datetimeInput = document.getElementById('reservation-datetime');
+  const minDate = new Date(Date.now() + 15 * 60 * 1000);
+  datetimeInput.min = minDate.toISOString().slice(0, 16);
+
+  // Сбрасываем форму
+  selectedTableId = null;
+  document.getElementById('reservation-form').reset();
+  document.getElementById('reservation-submit-btn').disabled = true;
+  document.getElementById('reservation-tables-grid').innerHTML = '';
+
+  // Обработчики событий
+  datetimeInput.addEventListener('change', handleReservationDateTimeChange);
+}
+
+/**
+ * Закрыть модальное окно бронирования
+ */
+function closeReservationModal() {
+  const modal = document.getElementById('reservation-modal');
+  modal.classList.remove('active');
+  
+  // Сбрасываем состояние
+  selectedTableId = null;
+  document.getElementById('reservation-form').reset();
+  document.getElementById('reservation-submit-btn').disabled = true;
+}
+
+/**
+ * Обработать изменение даты/времени брони
+ */
+async function handleReservationDateTimeChange(event) {
+  const datetime = event.target.value;
+  
+  if (!datetime || !restaurantId) {
+    return;
+  }
+
+  await loadReservationTables(datetime);
+}
+
+/**
+ * Загрузить доступные столы для бронирования
+ */
+async function loadReservationTables(datetime) {
+  const tablesLoading = document.getElementById('reservation-tables-loading');
+  const tablesGrid = document.getElementById('reservation-tables-grid');
+  const submitBtn = document.getElementById('reservation-submit-btn');
+  
+  tablesLoading.style.display = 'block';
+  tablesGrid.innerHTML = '';
+  selectedTableId = null;
+  submitBtn.disabled = true;
+
+  try {
+    availableTables = await API.getTableAvailability(restaurantId, datetime);
+    
+    if (!availableTables || availableTables.length === 0) {
+      tablesGrid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: #999; padding: 20px;">Нет доступных столов</p>';
+      return;
+    }
+
+    tablesGrid.innerHTML = availableTables.map(table => {
+      const isAvailable = table.is_available;
+      const statusText = isAvailable ? 'Доступен' : 'Занят';
+      const tableClass = isAvailable ? '' : 'table-unavailable';
+      
+      return `
+        <div class="reservation-table-item ${tableClass}" 
+             data-table-id="${table.id}" 
+             ${isAvailable ? `onclick="selectReservationTable('${table.id}')"` : ''}>
+          <div class="reservation-table-number">№${table.number}</div>
+          <div class="reservation-table-status">${statusText}</div>
+        </div>
+      `;
+    }).join('');
+  } catch (error) {
+    console.error('Failed to load tables:', error);
+    tablesGrid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: #c33; padding: 20px;">Ошибка загрузки столов</p>';
+    Utils.showError('Не удалось загрузить столы: ' + error.message);
+  } finally {
+    tablesLoading.style.display = 'none';
+  }
+}
+
+/**
+ * Выбрать стол для бронирования
+ */
+function selectReservationTable(tableId) {
+  selectedTableId = tableId;
+
+  // Обновляем визуальное отображение
+  document.querySelectorAll('.reservation-table-item').forEach(item => {
+    item.classList.remove('table-selected');
+    if (item.dataset.tableId === tableId) {
+      item.classList.add('table-selected');
+    }
+  });
+
+  // Активируем кнопку отправки
+  document.getElementById('reservation-submit-btn').disabled = false;
+}
+
+/**
+ * Обработать отправку формы бронирования
+ */
+document.addEventListener('DOMContentLoaded', () => {
+  const reservationForm = document.getElementById('reservation-form');
+  if (reservationForm) {
+    reservationForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      if (!selectedTableId) {
+        Utils.showError('Пожалуйста, выберите стол');
+        return;
+      }
+
+      const datetime = document.getElementById('reservation-datetime').value;
+      const guestsCount = parseInt(document.getElementById('reservation-guests').value);
+      const comment = document.getElementById('reservation-comment').value;
+
+      const submitBtn = document.getElementById('reservation-submit-btn');
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Отправка...';
+
+      try {
+        await API.createReservation({
+          tableId: selectedTableId,
+          guestsCount: guestsCount,
+          reservationDate: datetime,
+          comment: comment || undefined,
+        });
+
+        // Показываем успех
+        document.getElementById('reservation-form').style.display = 'none';
+        document.getElementById('reservation-success').style.display = 'block';
+
+        // Автоматически закрываем через 3 секунды
+        setTimeout(() => {
+          closeReservationModal();
+          // Перенаправляем в профиль
+          window.location.href = 'profile.html';
+        }, 3000);
+      } catch (error) {
+        console.error('Failed to create reservation:', error);
+        Utils.showError('Не удалось создать бронь: ' + error.message);
+        
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-check"></i> Забронировать';
+      }
+    });
+  }
+});
+
+// Экспорт функций для использования в HTML
+window.openReservationModal = openReservationModal;
+window.closeReservationModal = closeReservationModal;
+window.selectReservationTable = selectReservationTable;
 

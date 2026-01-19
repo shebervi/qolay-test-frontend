@@ -20,6 +20,7 @@ class OrdersWebSocket {
     this.onOrderCreated = options.onOrderCreated || (() => {});
     this.onOrderStatusChanged = options.onOrderStatusChanged || (() => {});
     this.onOrderUpdated = options.onOrderUpdated || (() => {});
+    this.onItemReadinessStatusChanged = options.onItemReadinessStatusChanged || (() => {});
     this.onConnect = options.onConnect || (() => {});
     this.onDisconnect = options.onDisconnect || (() => {});
     this.onError = options.onError || ((error) => console.error('WebSocket error:', error));
@@ -111,6 +112,11 @@ class OrdersWebSocket {
     this.socket.on('order.updated', (data) => {
       console.log('Order updated event received:', data);
       this.onOrderUpdated(data);
+    });
+
+    this.socket.on('order.item_readiness_status_changed', (data) => {
+      console.log('Order item readiness status changed event received:', data);
+      this.onItemReadinessStatusChanged(data);
     });
   }
 

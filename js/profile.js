@@ -25,8 +25,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Отображаем информацию о пользователе
     renderProfileInfo(user);
 
-    // Загружаем заказы и отзывы
+    // Загружаем заказы, брони и отзывы
     await loadOrders();
+    await loadReservations();
     await loadReviews();
 
     loadingIndicator.style.display = 'none';
@@ -74,6 +75,7 @@ function switchTab(tabName) {
 
   // Показываем соответствующий контент
   document.getElementById('orders-tab').style.display = tabName === 'orders' ? 'block' : 'none';
+  document.getElementById('reservations-tab').style.display = tabName === 'reservations' ? 'block' : 'none';
   document.getElementById('reviews-tab').style.display = tabName === 'reviews' ? 'block' : 'none';
 }
 
@@ -248,6 +250,131 @@ function renderReviewCard(review) {
   `;
 }
 
+/**
+ * Загрузить брони пользователя
+ */
+async function loadReservations() {
+  const reservationsList = document.getElementById('reservations-list');
+  
+  try {
+    const reservations = await API.getMyReservations();
+    
+    if (!reservations || reservations.length === 0) {
+      reservationsList.innerHTML = `
+        <div class="empty-state">
+          <i class="fas fa-calendar-check"></i>
+          <p>У вас пока нет броней</p>
+          <a href="restaurants.html" class="btn btn-primary" style="margin-top: 16px; padding: 12px 24px;">
+            <i class="fas fa-search"></i> Найти ресторан
+          </a>
+        </div>
+      `;
+      return;
+    }
+
+    reservationsList.innerHTML = reservations.map(reservation => renderReservationCard(reservation)).join('');
+  } catch (error) {
+    console.error('Failed to load reservations:', error);
+    reservationsList.innerHTML = `
+      <div class="error-message">
+        Не удалось загрузить брони: ${error.message}
+      </div>
+    `;
+  }
+}
+
+/**
+ * Отобразить карточку брони
+ */
+function renderReservationCard(reservation) {
+  const statusLabels = {
+    'PENDING': 'Ожидает подтверждения',
+    'CONFIRMED': 'Подтверждена',
+    'CANCELLED': 'Отменена',
+    'COMPLETED': 'Завершена',
+  };
+
+  const statusLabel = statusLabels[reservation.status] || reservation.status;
+  const restaurantName = reservation.restaurant?.name || 'Не указан';
+  const tableNumber = reservation.table?.number || 'Не указан';
+  const reservationDate = new Date(reservation.reservation_date).toLocaleString('ru-RU');
+  const guestsCount = reservation.guests_count || 1;
+  const createdAt = new Date(reservation.created_at).toLocaleString('ru-RU');
+
+  // Показываем кнопку отмены только для активных броней
+  const canCancel = reservation.status === 'PENDING' || reservation.status === 'CONFIRMED';
+
+  const cancelButton = canCancel ? `
+    <div class="reservation-actions">
+      <button class="btn-cancel" onclick="handleCancelReservation('${reservation.id}')">
+        <i class="fas fa-times"></i> Отменить бронь
+      </button>
+    </div>
+  ` : '';
+
+  const cancelInfo = reservation.cancelled_at ? `
+    <div style="margin-top: 8px; padding: 8px; background: #f8d7da; border-radius: 4px; font-size: 12px; color: #721c24;">
+      <strong>Отменено:</strong> ${new Date(reservation.cancelled_at).toLocaleString('ru-RU')}
+      ${reservation.cancelled_reason ? `<br/><strong>Причина:</strong> ${Utils.escapeHtml(reservation.cancelled_reason)}` : ''}
+    </div>
+  ` : '';
+
+  const completedInfo = reservation.completed_at ? `
+    <div style="margin-top: 8px; padding: 8px; background: #d1ecf1; border-radius: 4px; font-size: 12px; color: #0c5460;">
+      <strong>Завершено:</strong> ${new Date(reservation.completed_at).toLocaleString('ru-RU')}
+    </div>
+  ` : '';
+
+  return `
+    <div class="reservation-card">
+      <div class="order-header">
+        <div>
+          <div style="font-size: 18px; font-weight: 600; color: var(--primary-color, #ff6b35);">
+            <i class="fas fa-calendar-check"></i> Бронь стола №${tableNumber}
+          </div>
+          <div style="font-size: 12px; color: #999; margin-top: 4px;">
+            Создано: ${createdAt}
+          </div>
+        </div>
+        <span class="order-status reservation-status ${reservation.status}">${statusLabel}</span>
+      </div>
+      <div class="order-details">
+        <div><strong>Ресторан:</strong> ${Utils.escapeHtml(restaurantName)}</div>
+        <div><strong>Стол:</strong> №${tableNumber}</div>
+        <div><strong>Дата и время:</strong> ${reservationDate}</div>
+        <div><strong>Количество гостей:</strong> ${guestsCount}</div>
+        ${reservation.comment ? `<div><strong>Комментарий:</strong> ${Utils.escapeHtml(reservation.comment)}</div>` : ''}
+      </div>
+      ${cancelInfo}
+      ${completedInfo}
+      ${cancelButton}
+    </div>
+  `;
+}
+
+/**
+ * Обработать отмену брони
+ */
+async function handleCancelReservation(reservationId) {
+  if (!confirm('Вы уверены, что хотите отменить эту бронь?')) {
+    return;
+  }
+
+  const reason = prompt('Укажите причину отмены (необязательно):');
+
+  try {
+    await API.cancelReservation(reservationId, reason);
+    Utils.showSuccess('Бронь успешно отменена');
+    
+    // Перезагружаем брони
+    await loadReservations();
+  } catch (error) {
+    console.error('Failed to cancel reservation:', error);
+    Utils.showError('Не удалось отменить бронь: ' + error.message);
+  }
+}
+
 // Экспорт функций для использования в HTML
 window.switchTab = switchTab;
+window.handleCancelReservation = handleCancelReservation;
 

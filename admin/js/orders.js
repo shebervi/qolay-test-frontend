@@ -935,6 +935,8 @@ async function showOrderDetails(orderId) {
       const qty = item.qty || 1;
       const lineTotal = parseFloat(item.line_total_kzt || 0);
       const itemId = item.id || `item-${index}`;
+      const readinessStatus = item.readiness_status || 'COOKING';
+      const isReady = readinessStatus === 'READY';
 
       let modifiersHtml = '';
       if (item.modifiers && item.modifiers.length > 0) {
@@ -947,7 +949,7 @@ async function showOrderDetails(orderId) {
       }
 
       return `
-        <div class="order-item-row-new">
+        <div class="order-item-row-new" data-item-id="${itemId}">
           <div class="order-item-content">
             <div class="order-item-main">
               <span class="order-item-qty">${qty}×</span>
@@ -958,7 +960,7 @@ async function showOrderDetails(orderId) {
           <div class="order-item-right">
             <span class="order-item-price-new">${Utils.formatPrice(lineTotal)} ₸</span>
             <label class="toggle-switch">
-              <input type="checkbox" checked onchange="toggleOrderItem('${order.id}', '${itemId}', this.checked)">
+              <input type="checkbox" ${isReady ? 'checked' : ''} onchange="toggleOrderItem('${order.id}', '${itemId}', this.checked)" data-item-id="${itemId}">
               <span class="toggle-slider"></span>
             </label>
           </div>
@@ -972,7 +974,7 @@ async function showOrderDetails(orderId) {
     const timeStr = createdAtDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 
     details.innerHTML = `
-      <div class="order-details-new">
+      <div class="order-details-new" data-order-id="${order.id}">
         <div class="order-details-header">
           <div class="order-details-header-left">
             <h3 class="order-details-title">Детали заказа</h3>
@@ -1185,10 +1187,34 @@ async function updateOrderStatusFromModal(orderId, selectId) {
 /**
  * Переключить состояние товара в заказе
  */
-function toggleOrderItem(orderId, itemId, isChecked) {
-  // Здесь можно добавить логику для обновления состояния товара
-  console.log(`Toggle item ${itemId} in order ${orderId} to ${isChecked}`);
-  // Пока просто логируем, можно добавить API вызов если нужно
+async function toggleOrderItem(orderId, itemId, isChecked) {
+  try {
+    const readinessStatus = isChecked ? 'READY' : 'COOKING';
+    
+    await AdminAPI.updateItemReadinessStatus(orderId, itemId, readinessStatus);
+    
+    const statusText = isChecked ? 'Готово' : 'Готовится';
+    console.log(`Статус готовности блюда ${itemId} в заказе ${orderId} изменен на: ${statusText}`);
+    
+    const itemRow = document.querySelector(`[data-item-id="${itemId}"]`);
+    if (itemRow) {
+      const checkbox = itemRow.querySelector('input[type="checkbox"]');
+      if (checkbox) {
+        checkbox.checked = isChecked;
+      }
+    }
+  } catch (error) {
+    console.error('Ошибка при обновлении статуса готовности блюда:', error);
+    alert('Не удалось обновить статус готовности блюда. Попробуйте еще раз.');
+    
+    const itemRow = document.querySelector(`[data-item-id="${itemId}"]`);
+    if (itemRow) {
+      const checkbox = itemRow.querySelector('input[type="checkbox"]');
+      if (checkbox) {
+        checkbox.checked = !isChecked;
+      }
+    }
+  }
 }
 
 // Кэш текущих фильтров для предотвращения лишних переподписок
@@ -1376,6 +1402,42 @@ function initWebSocket() {
         if (shouldShowOrder(orderData)) {
           // Заказ соответствует фильтрам - перезагружаем
           await loadOrders();
+        }
+      }
+    },
+    onItemReadinessStatusChanged: async (data) => {
+      console.log('Order item readiness status changed:', data);
+      
+      const orderIndex = orders.findIndex(o => o.id === data.order_id);
+      
+      if (orderIndex !== -1) {
+        const order = orders[orderIndex];
+        
+        if (order.items && Array.isArray(order.items)) {
+          const itemIndex = order.items.findIndex(item => item.id === data.order_item_id);
+          
+          if (itemIndex !== -1) {
+            order.items[itemIndex].readiness_status = data.readiness_status;
+            
+            renderOrders(orders);
+            
+            const modal = document.getElementById('order-modal');
+            if (modal && modal.style.display !== 'none') {
+              const orderDetails = document.getElementById('order-details');
+              const orderIdInModal = orderDetails?.querySelector('[data-order-id]')?.dataset?.orderId;
+              if (orderIdInModal === data.order_id) {
+                const itemRow = orderDetails.querySelector(`[data-item-id="${data.order_item_id}"]`);
+                if (itemRow) {
+                  const checkbox = itemRow.querySelector('input[type="checkbox"]');
+                  if (checkbox) {
+                    const isReady = data.readiness_status === 'READY';
+                    checkbox.checked = isReady;
+                    console.log(`Updated checkbox for item ${data.order_item_id} to ${isReady ? 'checked' : 'unchecked'}`);
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },

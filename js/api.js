@@ -408,6 +408,75 @@ if (typeof window !== 'undefined') {
     createReview,
     getUserOrders,
     getUserReviews,
+    // Reservations
+    createReservation,
+    getMyReservations,
+    cancelReservation,
+    getTableAvailability,
   };
 }
 
+/**
+ * Создать бронь
+ * @param {object} data - Данные брони
+ * @returns {Promise<object>}
+ */
+async function createReservation(data) {
+  const response = await apiRequest('/public/reservations', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  
+  return response.data;
+}
+
+/**
+ * Получить свои брони
+ * @returns {Promise<Array>}
+ */
+async function getMyReservations() {
+  const response = await apiRequest('/public/reservations/my', {
+    method: 'GET',
+  });
+  
+  return response.data;
+}
+
+/**
+ * Отменить бронь
+ * @param {string} id - ID брони
+ * @param {string} reason - Причина отмены (опционально)
+ * @returns {Promise<object>}
+ */
+async function cancelReservation(id, reason = null) {
+  const body = {};
+  if (reason) {
+    body.reason = reason;
+  }
+  
+  const response = await apiRequest(`/public/reservations/${id}/cancel`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+  
+  return response.data;
+}
+
+/**
+ * Получить доступность столов
+ * @param {string} restaurantId - ID ресторана
+ * @param {string} date - Дата (ISO строка, опционально)
+ * @returns {Promise<Array>}
+ */
+async function getTableAvailability(restaurantId, date = null) {
+  let endpoint = `/public/reservations/tables/${restaurantId}/availability`;
+  if (date) {
+    endpoint += `?date=${encodeURIComponent(date)}`;
+  }
+  
+  const response = await apiRequest(endpoint, {
+    method: 'GET',
+  });
+  
+  return response.data;
+}

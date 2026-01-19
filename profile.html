@@ -79,20 +79,20 @@
       min-height: 400px;
     }
 
-    .orders-list, .reviews-list {
+    .orders-list, .reviews-list, .reservations-list {
       display: flex;
       flex-direction: column;
       gap: 16px;
     }
 
-    .order-card, .review-card {
+    .order-card, .review-card, .reservation-card {
       border: 1px solid #e0e0e0;
       border-radius: 8px;
       padding: 16px;
       transition: box-shadow 0.3s;
     }
 
-    .order-card:hover, .review-card:hover {
+    .order-card:hover, .review-card:hover, .reservation-card:hover {
       box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
 
@@ -126,6 +126,32 @@
     .review-status.APPROVED { background: #d4edda; color: #155724; }
     .review-status.PENDING { background: #fff3cd; color: #856404; }
     .review-status.REJECTED { background: #f8d7da; color: #721c24; }
+
+    .reservation-status.PENDING { background: #fff3cd; color: #856404; }
+    .reservation-status.CONFIRMED { background: #d4edda; color: #155724; }
+    .reservation-status.CANCELLED { background: #f8d7da; color: #721c24; }
+    .reservation-status.COMPLETED { background: #d1ecf1; color: #0c5460; }
+
+    .reservation-actions {
+      margin-top: 12px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-cancel {
+      padding: 8px 16px;
+      background: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.3s;
+    }
+
+    .btn-cancel:hover {
+      background: #c82333;
+    }
 
     .order-details, .review-details {
       display: flex;
@@ -233,6 +259,9 @@
           <button class="profile-tab active" data-tab="orders" onclick="switchTab('orders')">
             <i class="fas fa-shopping-bag"></i> Мои заказы
           </button>
+          <button class="profile-tab" data-tab="reservations" onclick="switchTab('reservations')">
+            <i class="fas fa-calendar-check"></i> Мои брони
+          </button>
           <button class="profile-tab" data-tab="reviews" onclick="switchTab('reviews')">
             <i class="fas fa-star"></i> Мои отзывы
           </button>
@@ -243,6 +272,12 @@
           <div id="orders-tab" class="tab-content">
             <div id="orders-list" class="orders-list">
               <!-- Заказы будут загружены через JS -->
+            </div>
+          </div>
+
+          <div id="reservations-tab" class="tab-content" style="display: none;">
+            <div id="reservations-list" class="reservations-list">
+              <!-- Брони будут загружены через JS -->
             </div>
           </div>
 

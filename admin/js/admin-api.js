@@ -661,6 +661,13 @@ async function adminUpdateOrderStatus(id, status) {
   });
 }
 
+async function adminUpdateItemReadinessStatus(orderId, itemId, readinessStatus) {
+  return apiRequest(`/public/orders/${orderId}/items/${itemId}/readiness-status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ readiness_status: readinessStatus }),
+  });
+}
+
 /**
  * Владельцы
  */
@@ -869,6 +876,7 @@ if (typeof window !== 'undefined') {
     getOrders: adminGetOrders,
     getOrder: adminGetOrder,
     updateOrderStatus: adminUpdateOrderStatus,
+    updateItemReadinessStatus: adminUpdateItemReadinessStatus,
     // Owners
     getOwners: adminGetOwners,
     createOwner: adminCreateOwner,
@@ -901,6 +909,139 @@ if (typeof window !== 'undefined') {
     deleteSocialLink: adminDeleteSocialLink,
     reorderSocialLinks: adminReorderSocialLinks,
     getSocialIconUrl: getSocialIconUrl,
+    // Reservations
+    getReservations: adminGetReservations,
+    getReservation: adminGetReservation,
+    createReservation: adminCreateReservation,
+    updateReservation: adminUpdateReservation,
+    confirmReservation: adminConfirmReservation,
+    completeReservation: adminCompleteReservation,
+    cancelReservation: adminCancelReservation,
   };
 }
 
+/**
+ * Получить список броней
+ * @param {object} filters - Фильтры (restaurantId, tableId, status, date)
+ * @returns {Promise<Array>}
+ */
+async function adminGetReservations(filters = {}) {
+  const params = new URLSearchParams();
+  if (filters.restaurantId) params.append('restaurantId', filters.restaurantId);
+  if (filters.tableId) params.append('tableId', filters.tableId);
+  if (filters.status) params.append('status', filters.status);
+  if (filters.date) params.append('date', filters.date);
+  
+  const query = params.toString();
+  const endpoint = query ? `/admin/reservations?${query}` : '/admin/reservations';
+  
+  try {
+    const response = await apiRequest(endpoint, {
+      method: 'GET',
+    });
+    
+    // Обрабатываем ответ - может быть массив или объект с data
+    if (Array.isArray(response)) {
+      return response;
+    }
+    
+    if (response?.data) {
+      return Array.isArray(response.data) ? response.data : [];
+    }
+    
+    return [];
+  } catch (error) {
+    console.error('adminGetReservations error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Получить бронь по ID
+ * @param {string} id - ID брони
+ * @returns {Promise<object>}
+ */
+async function adminGetReservation(id) {
+  const response = await apiRequest(`/admin/reservations/${id}`, {
+    method: 'GET',
+  });
+  
+  return response.data;
+}
+
+/**
+ * Создать бронь
+ * @param {object} data - Данные брони
+ * @returns {Promise<object>}
+ */
+async function adminCreateReservation(data) {
+  const response = await apiRequest('/admin/reservations', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  
+  return response.data;
+}
+
+/**
+ * Обновить бронь
+ * @param {string} id - ID брони
+ * @param {object} data - Данные для обновления
+ * @returns {Promise<object>}
+ */
+async function adminUpdateReservation(id, data) {
+  const response = await apiRequest(`/admin/reservations/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+  
+  return response.data;
+}
+
+/**
+ * Подтвердить бронь
+ * @param {string} id - ID брони
+ * @returns {Promise<object>}
+ */
+async function adminConfirmReservation(id) {
+  const response = await apiRequest(`/admin/reservations/${id}/confirm`, {
+    method: 'PATCH',
+    body: JSON.stringify({}),
+  });
+  
+  return response.data;
+}
+
+/**
+ * Завершить бронь
+ * @param {string} id - ID брони
+ * @returns {Promise<object>}
+ */
+async function adminCompleteReservation(id) {
+  const response = await apiRequest(`/admin/reservations/${id}/complete`, {
+    method: 'PATCH',
+    body: JSON.stringify({}),
+  });
+  
+  return response.data;
+}
+
+/**
+ * Отменить бронь
+ * @param {string} id - ID брони
+ * @param {string} reason - Причина отмены (опционально)
+ * @returns {Promise<object>}
+ */
+async function adminCancelReservation(id, reason = null) {
+  const body = {};
+  if (reason) {
+    body.reason = reason;
+  }
+  
+  const response = await apiRequest(`/admin/reservations/${id}/cancel`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+  
+  return response.data;
+}
