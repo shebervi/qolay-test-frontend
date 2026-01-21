@@ -36,6 +36,9 @@
         <a href="products.html" class="nav-item active" data-page="products">
           <i class="fas fa-utensils"></i> Продукты
         </a>
+        <a href="ingredients.html" class="nav-item" data-page="ingredients">
+          <i class="fas fa-leaf"></i> Ингредиенты
+        </a>
         <a href="banners.html" class="nav-item" data-page="banners">
           <i class="fas fa-bullseye"></i> Баннеры
         </a>
@@ -178,13 +181,13 @@
           </div>
 
           <div class="form-group" style="margin-top: 16px;">
-            <label for="product-composition">Состав</label>
-            <textarea id="product-composition" rows="4" placeholder="Молоко&#10;Яйца&#10;Мука&#10;Клубника&#10;Масло"></textarea>
-            <p style="font-size: 12px; color: #666; margin-top: 4px;">Введите каждый ингредиент с новой строки. Будет отображаться в виде тегов на странице продукта.</p>
-            <div id="composition-preview" style="margin-top: 12px; display: none;">
-              <p style="font-size: 12px; color: #666; margin-bottom: 8px;">Предпросмотр:</p>
-              <div id="composition-preview-tags" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
+            <label for="product-ingredient-input">Состав</label>
+            <div class="ingredient-input-wrap">
+              <input type="text" id="product-ingredient-input" placeholder="Начните вводить ингредиент" autocomplete="off">
+              <div id="product-ingredient-suggestions" class="ingredient-suggestions" style="display: none;"></div>
             </div>
+            <div id="product-ingredient-selected" class="ingredient-selected"></div>
+            <p style="font-size: 12px; color: #666; margin-top: 4px;">Введите на русском, выберите из списка или создайте новый ингредиент.</p>
           </div>
         </div>
 
@@ -232,4 +235,3 @@
   <script src="js/modifiers.js"></script>
 </body>
 </html>
-

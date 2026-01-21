@@ -9,6 +9,7 @@ let currentQRTokenHash = null; // Для хранения QR токена сто
 let restaurants = [];
 let currentUser = null;
 let currentView = 'tables'; // 'tables' или 'reservations'
+let tableReservationsMap = {};
 
 document.addEventListener('DOMContentLoaded', async () => {
   // Получаем текущего пользователя
@@ -85,29 +86,28 @@ async function loadTables(restaurantId = null) {
       return;
     }
 
-    // Загружаем активные брони для всех столов
-    let activeReservations = {};
+    // Загружаем брони для всех столов
+    let reservationsByTable = {};
     try {
-      // Загружаем все активные брони (PENDING и CONFIRMED)
       const filters = { restaurantId: restaurantId || undefined };
       const reservationsResponse = await AdminAPI.getReservations(filters);
       const allReservations = Array.isArray(reservationsResponse) 
         ? reservationsResponse 
         : (reservationsResponse?.data || []);
       
-      // Фильтруем только активные (PENDING и CONFIRMED) и группируем по table_id
+      // Группируем все брони по table_id
       allReservations.forEach(res => {
-        if (res.table_id && (res.status === 'PENDING' || res.status === 'CONFIRMED')) {
-          // Если уже есть бронь на этот стол, берем более позднюю
-          if (!activeReservations[res.table_id] || 
-              new Date(res.reservation_date) > new Date(activeReservations[res.table_id].reservation_date)) {
-            activeReservations[res.table_id] = res;
-          }
+        if (!res.table_id) return;
+        if (res.status !== 'PENDING' && res.status !== 'CONFIRMED') return;
+        if (!reservationsByTable[res.table_id]) {
+          reservationsByTable[res.table_id] = [];
         }
+        reservationsByTable[res.table_id].push(res);
       });
     } catch (error) {
       console.warn('Failed to load reservations for tables:', error);
     }
+    tableReservationsMap = reservationsByTable;
 
     // Проверяем права доступа
     const canEditTable = currentUser?.role !== 'WAITER';
@@ -123,10 +123,12 @@ async function loadTables(restaurantId = null) {
       };
       const status = statusLabels[table.status] || statusLabels['FREE'];
       
-      // Проверяем наличие активной брони
-      const activeReservation = activeReservations[table.id];
-      const reservationTime = activeReservation 
-        ? new Date(activeReservation.reservation_date).toLocaleString('ru-RU', {
+      const reservations = (reservationsByTable[table.id] || [])
+        .slice()
+        .sort((a, b) => new Date(a.reservation_date) - new Date(b.reservation_date));
+      const reservationCount = reservations.length;
+      const reservationTime = reservationCount === 1
+        ? new Date(reservations[0].reservation_date).toLocaleString('ru-RU', {
             day: '2-digit',
             month: '2-digit',
             year: 'numeric',
@@ -155,10 +157,15 @@ async function loadTables(restaurantId = null) {
             </div>
           </td>
           <td>
-            ${activeReservation ? `
-              <button class="btn-link" onclick="openReservationDetailsModal('${activeReservation.id}')" style="color: #856404; font-weight: 500; text-decoration: none; background: none; border: none; padding: 0; cursor: pointer;">
+            ${reservationCount === 1 ? `
+              <button class="btn-link" onclick="openReservationDetailsModal('${reservations[0].id}')" style="color: #856404; font-weight: 500; text-decoration: none; background: none; border: none; padding: 0; cursor: pointer;">
                 <i class="fas fa-calendar-check" style="margin-right: 4px;"></i>
                 ${reservationTime}
+              </button>
+            ` : reservationCount > 1 ? `
+              <button class="btn-link" onclick="openTableReservationsModal('${table.id}', '${table.number}')" style="color: #856404; font-weight: 500; text-decoration: none; background: none; border: none; padding: 0; cursor: pointer;">
+                <i class="fas fa-calendar-alt" style="margin-right: 4px;"></i>
+                Броней: ${reservationCount}
               </button>
             ` : `
               <button class="btn-link" onclick="openCreateReservationModal('${table.id}', '${table.restaurant_id}')" style="color: var(--primary-color, #ff6b35); text-decoration: none; font-weight: 500; background: none; border: none; padding: 0; cursor: pointer;">
@@ -194,7 +201,7 @@ async function loadTables(restaurantId = null) {
           <tr>
             <th>№ стола</th>
             <th>Статус</th>
-            <th>Время бронирования</th>
+            <th>Брони</th>
             <th>Дата продления QR-кода</th>
             <th>Действия</th>
           </tr>
@@ -597,6 +604,14 @@ async function loadReservations() {
   }
 }
 
+async function refreshAfterReservationChange() {
+  if (currentView === 'tables') {
+    await loadTables(document.getElementById('restaurant-filter')?.value || null);
+  } else {
+    await loadReservations();
+  }
+}
+
 /**
  * Подтвердить бронь
  */
@@ -606,7 +621,7 @@ async function confirmReservation(id) {
   try {
     await AdminAPI.confirmReservation(id);
     Utils.showSuccess('Бронь подтверждена');
-    await loadReservations();
+    await refreshAfterReservationChange();
   } catch (error) {
     console.error('Failed to confirm reservation:', error);
     Utils.showError('Не удалось подтвердить бронь: ' + error.message);
@@ -622,7 +637,7 @@ async function completeReservation(id) {
   try {
     await AdminAPI.completeReservation(id);
     Utils.showSuccess('Бронь завершена');
-    await loadReservations();
+    await refreshAfterReservationChange();
   } catch (error) {
     console.error('Failed to complete reservation:', error);
     Utils.showError('Не удалось завершить бронь: ' + error.message);
@@ -639,7 +654,7 @@ async function cancelReservationAdmin(id) {
   try {
     await AdminAPI.cancelReservation(id, reason || undefined);
     Utils.showSuccess('Бронь отменена');
-    await loadReservations();
+    await refreshAfterReservationChange();
   } catch (error) {
     console.error('Failed to cancel reservation:', error);
     Utils.showError('Не удалось отменить бронь: ' + error.message);
@@ -923,6 +938,73 @@ async function openReservationDetailsModal(reservationId) {
   }
 }
 
+function openTableReservationsModal(tableId, tableNumber) {
+  const modal = document.getElementById('table-reservations-modal');
+  const title = document.getElementById('table-reservations-title');
+  const content = document.getElementById('table-reservations-content');
+  const reservations = (tableReservationsMap[tableId] || [])
+    .slice()
+    .sort((a, b) => new Date(a.reservation_date) - new Date(b.reservation_date));
+
+  title.textContent = `Брони стола №${tableNumber}`;
+  content.innerHTML = '';
+
+  if (reservations.length === 0) {
+    content.innerHTML = '<div class="empty-state">Брони для этого стола не найдены.</div>';
+    modal.classList.add('active');
+    return;
+  }
+
+  const statusLabels = {
+    PENDING: { text: 'Ожидает подтверждения', class: 'status-pending' },
+    CONFIRMED: { text: 'Подтверждена', class: 'status-confirmed' },
+    CANCELLED: { text: 'Отменена', class: 'status-cancelled' },
+    COMPLETED: { text: 'Завершена', class: 'status-completed' },
+  };
+
+  const items = reservations.map((res) => {
+    const reservationDate = new Date(res.reservation_date).toLocaleString('ru-RU');
+    const status = statusLabels[res.status] || statusLabels.PENDING;
+    const guestName = Utils.escapeHtml(res.guest_name);
+    const guestPhone = Utils.escapeHtml(res.guest_phone);
+
+    const actions = res.status === 'PENDING'
+      ? `<button class="btn btn-sm btn-success" onclick="confirmReservation('${res.id}')">Подтвердить</button>`
+      : res.status === 'CONFIRMED'
+      ? `<button class="btn btn-sm btn-primary" onclick="completeReservation('${res.id}')">Завершить</button>`
+      : '';
+
+    const cancelBtn = (res.status === 'PENDING' || res.status === 'CONFIRMED')
+      ? `<button class="btn btn-sm btn-danger" onclick="cancelReservationAdmin('${res.id}')">Отменить</button>`
+      : '';
+
+    return `
+      <div class="list-item">
+        <div class="list-item-info">
+          <h4>Бронь на ${reservationDate}</h4>
+          <p><strong>Гость:</strong> ${guestName} (${guestPhone})</p>
+          <p><strong>Гостей:</strong> ${res.guests_count}</p>
+          ${res.comment ? `<p><strong>Комментарий:</strong> ${Utils.escapeHtml(res.comment)}</p>` : ''}
+        </div>
+        <div class="list-item-actions">
+          <span class="status-badge ${status.class}">${status.text}</span>
+          <button class="btn btn-sm btn-secondary" onclick="openReservationDetailsModal('${res.id}')">Открыть</button>
+          ${actions}
+          ${cancelBtn}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  content.innerHTML = items;
+  modal.classList.add('active');
+}
+
+function closeTableReservationsModal() {
+  const modal = document.getElementById('table-reservations-modal');
+  modal.classList.remove('active');
+}
+
 /**
  * Закрыть модальное окно с информацией о брони
  */
@@ -1095,9 +1177,10 @@ window.openCreateReservationModal = openCreateReservationModal;
 window.closeReservationModal = closeReservationModal;
 window.toggleStatusSelect = toggleStatusSelect;
 window.openReservationDetailsModal = openReservationDetailsModal;
+window.openTableReservationsModal = openTableReservationsModal;
+window.closeTableReservationsModal = closeTableReservationsModal;
 window.closeReservationDetailsModal = closeReservationDetailsModal;
 window.openEditReservationModal = openEditReservationModal;
 window.confirmReservationFromDetails = confirmReservationFromDetails;
 window.completeReservationFromDetails = completeReservationFromDetails;
 window.cancelReservationFromDetails = cancelReservationFromDetails;
-

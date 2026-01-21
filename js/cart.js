@@ -10,6 +10,7 @@
  */
 
 let cartData = null;
+let cartSocket = null;
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', async () => {
@@ -42,6 +43,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     cartData = await API.getCart(sessionId);
     loadingIndicator.style.display = 'none';
 
+    setupCartWebSocket();
+
     if (!cartData || !cartData.items || cartData.items.length === 0) {
       cartEmpty.style.display = 'flex';
       cartContent.style.display = 'none';
@@ -60,10 +63,55 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error('Failed to load cart:', error);
   }
 
+  function setupCartWebSocket() {
+    if (cartSocket) {
+      return;
+    }
+
+    const serverUrl = CONFIG.API_BASE_URL;
+    cartSocket = new CartWebSocket(serverUrl, {
+      sessionId,
+      onCartUpdated: (payload) => {
+        if (!payload || payload.sessionId !== sessionId) {
+          return;
+        }
+
+        const previousCart = cartData;
+        cartData = payload.cart;
+        const highlightItemIds = getHighlightItemIds(previousCart, cartData);
+        if (!cartData || !cartData.items || cartData.items.length === 0) {
+          cartEmpty.style.display = 'flex';
+          cartContent.style.display = 'none';
+          return;
+        }
+
+        cartEmpty.style.display = 'none';
+        cartContent.style.display = 'flex';
+        cartContent.style.flex = '1';
+        renderCart(highlightItemIds);
+        setupEventListeners();
+      },
+      onCartCleared: (payload) => {
+        if (!payload || payload.sessionId !== sessionId) {
+          return;
+        }
+
+        cartData = cartData
+          ? { ...cartData, items: [], subtotal: '0.00', total: '0.00' }
+          : { items: [], subtotal: '0.00', total: '0.00' };
+        cartEmpty.style.display = 'flex';
+        cartContent.style.display = 'none';
+      },
+      onError: (error) => {
+        console.error('Cart WebSocket error:', error);
+      },
+    });
+  }
+
   /**
    * Отобразить корзину
    */
-  function renderCart() {
+  function renderCart(highlightItemIds = new Set()) {
     if (!cartData || !cartData.items) {
       return;
     }
@@ -76,7 +124,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Отобразить товары
     cartData.items.forEach(item => {
-      const itemElement = createCartItemElement(item);
+      const shouldHighlight = highlightItemIds.has(item.itemId);
+      const itemElement = createCartItemElement(item, shouldHighlight);
       cartItems.appendChild(itemElement);
     });
 
@@ -87,9 +136,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   /**
    * Создать элемент товара в корзине
    */
-  function createCartItemElement(item) {
+  function createCartItemElement(item, shouldHighlight) {
     const itemDiv = document.createElement('div');
-    itemDiv.className = 'cart-item';
+    itemDiv.className = shouldHighlight ? 'cart-item cart-item--new' : 'cart-item';
     itemDiv.dataset.itemId = item.itemId;
 
     const productName = item.name?.ru || item.name?.kk || item.name?.en || 'Товар';
@@ -166,6 +215,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     return itemDiv;
   }
 
+  function getHighlightItemIds(previousCart, nextCart) {
+    if (!previousCart || !previousCart.items || !nextCart || !nextCart.items) {
+      return new Set();
+    }
+
+    const previousMap = new Map();
+    previousCart.items.forEach((item) => {
+      previousMap.set(item.itemId, item.quantity || 0);
+    });
+
+    const highlight = new Set();
+    nextCart.items.forEach((item) => {
+      const prevQuantity = previousMap.get(item.itemId);
+      const nextQuantity = item.quantity || 0;
+
+      if (prevQuantity === undefined || nextQuantity > prevQuantity) {
+        highlight.add(item.itemId);
+      }
+    });
+
+    return highlight;
+  }
+
   /**
    * Обновить итоговую сумму
    */
@@ -188,7 +260,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Увеличение количества товара
     document.querySelectorAll('.increase-item').forEach(btn => {
       btn.addEventListener('click', async (e) => {
-        const itemId = e.target.dataset.itemId;
+        const target = e.target.closest('.increase-item');
+        const itemId = target ? target.dataset.itemId : null;
+        if (!itemId) {
+          return;
+        }
         await updateItemQuantity(itemId, 1);
       });
     });
@@ -196,7 +272,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Уменьшение количества товара
     document.querySelectorAll('.decrease-item').forEach(btn => {
       btn.addEventListener('click', async (e) => {
-        const itemId = e.target.dataset.itemId;
+        const target = e.target.closest('.decrease-item');
+        const itemId = target ? target.dataset.itemId : null;
+        if (!itemId) {
+          return;
+        }
         const item = cartData.items.find(i => i.itemId === itemId);
         if (item && item.quantity > 1) {
           await updateItemQuantity(itemId, -1);
@@ -207,7 +287,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Удаление товара
     document.querySelectorAll('.btn-remove-item').forEach(btn => {
       btn.addEventListener('click', async (e) => {
-        const itemId = e.target.dataset.itemId;
+        const target = e.target.closest('.btn-remove-item');
+        const itemId = target ? target.dataset.itemId : null;
+        if (!itemId) {
+          return;
+        }
         if (confirm('Удалить товар из корзины?')) {
           await removeItem(itemId);
         }
@@ -295,4 +379,3 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 });
-

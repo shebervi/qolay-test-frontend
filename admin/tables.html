@@ -36,6 +36,9 @@
         <a href="products.html" class="nav-item" data-page="products">
           <i class="fas fa-utensils"></i> Продукты
         </a>
+        <a href="ingredients.html" class="nav-item" data-page="ingredients">
+          <i class="fas fa-leaf"></i> Ингредиенты
+        </a>
         <a href="banners.html" class="nav-item" data-page="banners">
           <i class="fas fa-bullseye"></i> Баннеры
         </a>
@@ -165,6 +168,19 @@
     </div>
   </div>
 
+  <!-- Modal для списка броней стола -->
+  <div id="table-reservations-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="table-reservations-title">Брони стола</h3>
+        <button class="modal-close" onclick="closeTableReservationsModal()">&times;</button>
+      </div>
+      <div id="table-reservations-content" class="admin-form" style="padding: 28px;">
+        <div class="loading">Загрузка...</div>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal для создания/редактирования брони -->
   <div id="reservation-modal" class="modal">
     <div class="modal-content">
@@ -220,4 +236,3 @@
   <script src="js/tables.js"></script>
 </body>
 </html>
-

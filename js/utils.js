@@ -223,16 +223,29 @@ async function updateCartBadge() {
 
   try {
     const cart = await API.getCart(sessionId);
-    const totalItems = cart?.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
-    
-    if (totalItems > 0) {
-      cartCountElement.textContent = totalItems > 99 ? '99+' : totalItems.toString();
-      cartCountElement.style.display = 'flex';
-    } else {
-      cartCountElement.style.display = 'none';
-    }
+    updateCartBadgeFromCart(cart);
   } catch (error) {
     console.error('Failed to update cart badge:', error);
+    cartCountElement.style.display = 'none';
+  }
+}
+
+/**
+ * Обновить счетчик корзины по данным корзины
+ * @param {object} cart - Данные корзины
+ */
+function updateCartBadgeFromCart(cart) {
+  const cartCountElement = document.getElementById('cart-count');
+  if (!cartCountElement) return;
+
+  const totalItems =
+    cart?.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
+
+  if (totalItems > 0) {
+    cartCountElement.textContent =
+      totalItems > 99 ? '99+' : totalItems.toString();
+    cartCountElement.style.display = 'flex';
+  } else {
     cartCountElement.style.display = 'none';
   }
 }
@@ -259,6 +272,6 @@ if (typeof window !== 'undefined') {
     getProductImageUrl,
     escapeHtml,
     updateCartBadge,
+    updateCartBadgeFromCart,
   };
 }
-

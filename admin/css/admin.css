@@ -446,6 +446,126 @@
   line-height: 1.5;
 }
 
+/* Ingredients autocomplete */
+.ingredient-input-wrap {
+  position: relative;
+}
+
+.ingredient-suggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--admin-card-bg);
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  box-shadow: var(--admin-shadow-md);
+  max-height: 220px;
+  overflow-y: auto;
+  z-index: 200;
+}
+
+.ingredient-suggestion-item {
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--admin-text);
+}
+
+.ingredient-suggestion-item:hover {
+  background: #f1f5f9;
+}
+
+.ingredient-suggestion-create {
+  font-weight: 600;
+  color: var(--admin-primary);
+}
+
+.ingredient-suggestion-empty {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--admin-text-secondary);
+}
+
+.ingredient-selected {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ingredient-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 16px;
+  background: #f1f5f9;
+  border: 1px solid var(--admin-border);
+  font-size: 12px;
+  color: var(--admin-text);
+}
+
+.ingredient-chip button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--admin-text-secondary);
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+}
+
+.ingredient-empty {
+  font-size: 12px;
+  color: var(--admin-text-secondary);
+  padding: 6px 0;
+}
+
+.ingredient-allergen {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: #fee2e2;
+  color: #b91c1c;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 8px;
+}
+
+.ingredient-allergen-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--admin-text-secondary);
+  margin-top: 6px;
+}
+
+.ingredient-allergen-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+}
+
+.ingredient-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ingredient-translate-btn {
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+.ingredient-table-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
 .form-actions {
   display: flex;
   gap: 12px;
@@ -2222,4 +2342,3 @@
   outline: 2px solid var(--admin-primary);
   outline-offset: 2px;
 }
-

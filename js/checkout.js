@@ -9,6 +9,7 @@
  */
 
 let cartData = null;
+let cartSocket = null;
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', async () => {
@@ -48,10 +49,53 @@ document.addEventListener('DOMContentLoaded', async () => {
     checkoutContent.style.display = 'flex';
     renderOrderSummary();
     setupFormHandler();
+    setupCartWebSocket();
   } catch (error) {
     loadingIndicator.style.display = 'none';
     Utils.showError('Не удалось загрузить корзину: ' + error.message);
     console.error('Failed to load cart:', error);
+  }
+
+  function setupCartWebSocket() {
+    if (cartSocket) {
+      return;
+    }
+
+    const serverUrl = CONFIG.API_BASE_URL;
+    cartSocket = new CartWebSocket(serverUrl, {
+      sessionId,
+      onCartUpdated: (payload) => {
+        if (!payload || payload.sessionId !== sessionId) {
+          return;
+        }
+
+        cartData = payload.cart;
+        if (!cartData || !cartData.items || cartData.items.length === 0) {
+          submitBtn.disabled = true;
+          showError('Корзина была очищена. Пожалуйста, добавьте товары заново.');
+          setTimeout(() => {
+            window.location.href = 'menu.html';
+          }, 2000);
+          return;
+        }
+
+        renderOrderSummary();
+      },
+      onCartCleared: (payload) => {
+        if (!payload || payload.sessionId !== sessionId) {
+          return;
+        }
+
+        submitBtn.disabled = true;
+        showError('Корзина была очищена. Пожалуйста, добавьте товары заново.');
+        setTimeout(() => {
+          window.location.href = 'menu.html';
+        }, 2000);
+      },
+      onError: (error) => {
+        console.error('Cart WebSocket error:', error);
+      },
+    });
   }
 
   /**
@@ -193,4 +237,3 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 5000);
   }
 });
-

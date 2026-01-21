@@ -25,7 +25,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   
   const tableToken = tableTokenFromUrl || tableTokenFromStorage;
-  const sessionId = Utils.getSession();
+  let sessionId = Utils.getSession();
+  let cartSocket = null;
 
   // Если нет сессии или токена - редиректим на guests.html
   if (!sessionId || !tableToken) {
@@ -52,6 +53,39 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Показываем ссылку на профиль, если пользователь авторизован
   if (profileLink && typeof Auth !== 'undefined' && Auth.isAuthenticated() && Auth.isUser()) {
     profileLink.style.display = 'block';
+  }
+
+  function ensureCartBadgeWebSocket() {
+    if (!sessionId) {
+      return;
+    }
+
+    if (!cartSocket) {
+      const serverUrl = CONFIG.API_BASE_URL;
+      cartSocket = new CartWebSocket(serverUrl, {
+        sessionId,
+        onCartUpdated: (payload) => {
+          if (!payload || payload.sessionId !== sessionId) {
+            return;
+          }
+          Utils.updateCartBadgeFromCart(payload.cart);
+        },
+        onCartCleared: (payload) => {
+          if (!payload || payload.sessionId !== sessionId) {
+            return;
+          }
+          Utils.updateCartBadgeFromCart({ items: [] });
+        },
+        onError: (error) => {
+          console.error('Cart WebSocket error:', error);
+        },
+      });
+    } else {
+      if (cartSocket.sessionId && cartSocket.sessionId !== sessionId) {
+        cartSocket.unsubscribeFromCart(cartSocket.sessionId);
+      }
+      cartSocket.subscribeToCart(sessionId);
+    }
   }
 
   // Загрузить меню
@@ -292,6 +326,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           const cartResult = await API.createCart(tableToken);
           sessionId = cartResult.sessionId;
           Utils.saveSession(sessionId, tableToken);
+          ensureCartBadgeWebSocket();
           
           // Восстанавливаем сохраненное количество гостей
           const savedGuestsCount = localStorage.getItem('guests_count');
@@ -679,5 +714,5 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Инициализировать счетчик корзины при загрузке
   Utils.updateCartBadge();
+  ensureCartBadgeWebSocket();
 });
-

@@ -355,6 +355,53 @@ async function adminUploadProductImage(id, file) {
 }
 
 /**
+ * Ингредиенты
+ */
+async function adminSearchIngredients(query, restaurantId) {
+  const params = new URLSearchParams();
+  if (query) params.append('query', query);
+  if (restaurantId) params.append('restaurantId', restaurantId);
+  return apiRequest(`/ingredients/search?${params.toString()}`);
+}
+
+async function adminGetIngredients(restaurantId, query) {
+  const params = [];
+  if (restaurantId) params.push(`restaurantId=${encodeURIComponent(restaurantId)}`);
+  if (query) params.push(`query=${encodeURIComponent(query)}`);
+  params.push('page=1');
+  params.push('limit=100');
+  const url = `/ingredients?${params.join('&')}`;
+  return apiRequest(url);
+}
+
+async function adminCreateIngredient(data) {
+  return apiRequest('/ingredients', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+async function adminUpdateIngredient(id, data) {
+  return apiRequest(`/ingredients/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+async function adminDeleteIngredient(id) {
+  return apiRequest(`/ingredients/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+async function adminSetProductIngredients(productId, ingredients) {
+  return apiRequest(`/products/${productId}/ingredients`, {
+    method: 'POST',
+    body: JSON.stringify({ ingredients }),
+  });
+}
+
+/**
  * Модификаторы
  */
 async function adminGetModifierGroups(productId) {
@@ -857,6 +904,13 @@ if (typeof window !== 'undefined') {
     deleteProduct: adminDeleteProduct,
     uploadProductImage: adminUploadProductImage,
     deleteProductImage: adminDeleteProductImage,
+    // Ingredients
+    searchIngredients: adminSearchIngredients,
+    getIngredients: adminGetIngredients,
+    createIngredient: adminCreateIngredient,
+    updateIngredient: adminUpdateIngredient,
+    deleteIngredient: adminDeleteIngredient,
+    setProductIngredients: adminSetProductIngredients,
     // Modifiers
     getModifierGroups: adminGetModifierGroups,
     createModifierGroup: adminCreateModifierGroup,

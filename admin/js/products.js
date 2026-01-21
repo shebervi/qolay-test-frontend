@@ -6,6 +6,12 @@ let currentProductId = null;
 let restaurants = [];
 let categories = [];
 let currentUser = null;
+let selectedIngredients = [];
+let ingredientSearchTimeout = null;
+let activeIngredientQuery = '';
+let ingredientSuggestions = [];
+let ingredientsDirty = false;
+let initialComposition = [];
 
 // Безопасный доступ к Utils
 const Utils = window.Utils || {
@@ -13,6 +19,13 @@ const Utils = window.Utils || {
     const numPrice = typeof price === 'string' ? parseFloat(price) : price;
     return new Intl.NumberFormat('ru-RU').format(numPrice);
   },
+  escapeHtml: (text) =>
+    String(text ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;'),
   showError: (msg) => {
     console.error(msg);
     alert('Ошибка: ' + msg);
@@ -53,6 +66,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Обработка изменения ресторана в форме
   document.getElementById('product-restaurant').addEventListener('change', async (e) => {
     await loadCategoriesForForm(e.target.value);
+    ingredientsDirty = true;
+    initialComposition = [];
+    resetSelectedIngredients();
+    updateIngredientInputState();
   });
 
   // Обработка формы
@@ -61,10 +78,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     await saveProduct();
   });
 
-  // Обработка изменения состава для предпросмотра
-  document.getElementById('product-composition').addEventListener('input', (e) => {
-    updateCompositionPreview(e.target.value);
-  });
+  setupIngredientControls();
+  updateIngredientInputState();
 
   // Обработка загрузки изображений
   document.getElementById('product-image').addEventListener('change', async (e) => {
@@ -108,26 +123,244 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 /**
- * Обновить предпросмотр состава
+ * Ингредиенты: автокомплит и выбранные элементы
  */
-function updateCompositionPreview(text) {
-  const previewContainer = document.getElementById('composition-preview');
-  const previewTags = document.getElementById('composition-preview-tags');
-  
-  if (!previewContainer || !previewTags) return;
-  
-  const items = text.trim().split('\n')
-    .map(item => item.trim())
-    .filter(item => item.length > 0);
-  
-  if (items.length > 0) {
-    previewTags.innerHTML = items.map(item => {
-      return `<span style="padding: 6px 12px; background-color: #f5f5f5; border-radius: 20px; font-size: 14px; color: var(--primary-color);">${item}</span>`;
-    }).join('');
-    previewContainer.style.display = 'block';
-  } else {
-    previewContainer.style.display = 'none';
+function updateIngredientInputState() {
+  const input = document.getElementById('product-ingredient-input');
+  const restaurantId = document.getElementById('product-restaurant')?.value;
+  if (!input) return;
+
+  const enabled = Boolean(restaurantId);
+  input.disabled = !enabled;
+  input.placeholder = enabled ? 'Начните вводить ингредиент' : 'Сначала выберите ресторан';
+}
+
+function resetSelectedIngredients() {
+  selectedIngredients = [];
+  ingredientSuggestions = [];
+  renderSelectedIngredients();
+  clearIngredientInput();
+}
+
+function clearIngredientInput() {
+  const input = document.getElementById('product-ingredient-input');
+  if (input) input.value = '';
+  hideIngredientSuggestions();
+}
+
+function hideIngredientSuggestions() {
+  const suggestions = document.getElementById('product-ingredient-suggestions');
+  if (!suggestions) return;
+  suggestions.style.display = 'none';
+  suggestions.innerHTML = '';
+}
+
+function normalizeIngredientName(name) {
+  return String(name || '').trim().toLowerCase();
+}
+
+function mapIngredientFromApi(item) {
+  if (!item) return null;
+  return {
+    id: item.id,
+    nameRu: item.nameRu || item.name_ru || item.name?.ru || '',
+    nameKk: item.nameKk || item.name_kk || item.name?.kk || null,
+    nameEn: item.nameEn || item.name_en || item.name?.en || null,
+    isAllergen: item.isAllergen ?? item.is_allergen ?? false,
+    sortOrder: item.sortOrder ?? item.sort_order ?? 0,
+  };
+}
+
+function getIngredientDisplayName(ingredient) {
+  return ingredient.nameRu || ingredient.nameKk || ingredient.nameEn || '';
+}
+
+function renderSelectedIngredients() {
+  const container = document.getElementById('product-ingredient-selected');
+  if (!container) return;
+
+  if (!selectedIngredients.length) {
+    container.innerHTML = '<div class="ingredient-empty">Нет ингредиентов</div>';
+    return;
   }
+
+  container.innerHTML = selectedIngredients
+    .map((ingredient) => {
+      const name = Utils.escapeHtml(getIngredientDisplayName(ingredient));
+      return `
+        <span class="ingredient-chip">
+          ${name}
+          <button type="button" data-remove-ingredient="${ingredient.id}" aria-label="Удалить">&times;</button>
+        </span>
+      `;
+    })
+    .join('');
+}
+
+function renderIngredientSuggestions(items, query) {
+  const suggestions = document.getElementById('product-ingredient-suggestions');
+  if (!suggestions) return;
+
+  const filtered = items.filter(
+    (item) => !selectedIngredients.some((selected) => selected.id === item.id),
+  );
+
+  ingredientSuggestions = filtered;
+
+  const normalizedQuery = normalizeIngredientName(query);
+  const hasExactMatch =
+    normalizedQuery &&
+    (filtered.some((item) => normalizeIngredientName(item.nameRu) === normalizedQuery) ||
+      selectedIngredients.some((item) => normalizeIngredientName(item.nameRu) === normalizedQuery));
+
+  let html = filtered
+    .map((item) => {
+      const name = Utils.escapeHtml(getIngredientDisplayName(item));
+      return `<div class="ingredient-suggestion-item" data-ingredient-id="${item.id}">${name}</div>`;
+    })
+    .join('');
+
+  if (normalizedQuery && !hasExactMatch) {
+    const trimmedQuery = query.trim();
+    const escapedQuery = Utils.escapeHtml(trimmedQuery);
+    const encodedQuery = encodeURIComponent(trimmedQuery);
+    html += `<div class="ingredient-suggestion-item ingredient-suggestion-create" data-create-ingredient="${encodedQuery}">Создать "${escapedQuery}"</div>`;
+  }
+
+  if (!html) {
+    html = '<div class="ingredient-suggestion-empty">Ничего не найдено</div>';
+  }
+
+  suggestions.innerHTML = html;
+  suggestions.style.display = 'block';
+}
+
+async function searchIngredients(query) {
+  const restaurantId = document.getElementById('product-restaurant')?.value;
+  if (!restaurantId) {
+    hideIngredientSuggestions();
+    return;
+  }
+
+  activeIngredientQuery = query;
+  try {
+    const response = await AdminAPI.searchIngredients(query, restaurantId);
+    const items = response?.data?.data || response?.data || [];
+    if (activeIngredientQuery !== query) return;
+    const mapped = items.map(mapIngredientFromApi).filter(Boolean);
+    renderIngredientSuggestions(mapped, query);
+  } catch (error) {
+    console.error('Failed to search ingredients:', error);
+    hideIngredientSuggestions();
+  }
+}
+
+async function createIngredientFromQuery(nameRu) {
+  const restaurantId = document.getElementById('product-restaurant')?.value;
+  if (!restaurantId) {
+    Utils.showError('Сначала выберите ресторан');
+    return;
+  }
+
+  const trimmedName = nameRu.trim();
+  if (!trimmedName) return;
+
+  try {
+    const response = await AdminAPI.createIngredient({
+      restaurantId,
+      nameRu: trimmedName,
+    });
+    const ingredient = mapIngredientFromApi(response?.data?.data || response?.data);
+    if (ingredient) {
+      addIngredientToSelected(ingredient);
+    }
+    clearIngredientInput();
+  } catch (error) {
+    console.error('Failed to create ingredient:', error);
+    Utils.showError('Не удалось создать ингредиент');
+  }
+}
+
+function addIngredientToSelected(ingredient) {
+  if (!ingredient?.id) return;
+  const exists = selectedIngredients.some((item) => item.id === ingredient.id);
+  if (exists) return;
+  selectedIngredients.push(ingredient);
+  ingredientsDirty = true;
+  renderSelectedIngredients();
+}
+
+function setupIngredientControls() {
+  const input = document.getElementById('product-ingredient-input');
+  const suggestions = document.getElementById('product-ingredient-suggestions');
+  const selected = document.getElementById('product-ingredient-selected');
+  if (!input || !suggestions || !selected) return;
+
+  const inputWrap = input.closest('.ingredient-input-wrap');
+
+  input.addEventListener('input', (event) => {
+    const query = event.target.value.trim();
+    clearTimeout(ingredientSearchTimeout);
+    if (query.length < 2) {
+      ingredientSuggestions = [];
+      hideIngredientSuggestions();
+      return;
+    }
+    ingredientSearchTimeout = setTimeout(() => searchIngredients(query), 250);
+  });
+
+  input.addEventListener('keydown', async (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    const query = input.value.trim();
+    const firstSuggestion = query.length >= 2 ? ingredientSuggestions[0] : null;
+    if (firstSuggestion) {
+      addIngredientToSelected(firstSuggestion);
+      clearIngredientInput();
+      return;
+    }
+    if (query.length >= 2) {
+      await createIngredientFromQuery(query);
+    }
+  });
+
+  suggestions.addEventListener('click', async (event) => {
+    const suggestionItem = event.target.closest('[data-ingredient-id]');
+    if (suggestionItem) {
+      const ingredientId = suggestionItem.getAttribute('data-ingredient-id');
+      const ingredient = ingredientSuggestions.find((item) => item.id === ingredientId);
+      if (ingredient) {
+        addIngredientToSelected(ingredient);
+        clearIngredientInput();
+      }
+      return;
+    }
+
+    const createItem = event.target.closest('[data-create-ingredient]');
+    if (createItem) {
+      const encodedName = createItem.getAttribute('data-create-ingredient') || '';
+      const nameRu = decodeURIComponent(encodedName);
+      await createIngredientFromQuery(nameRu);
+    }
+  });
+
+  selected.addEventListener('click', (event) => {
+    const removeButton = event.target.closest('[data-remove-ingredient]');
+    if (!removeButton) return;
+    const ingredientId = removeButton.getAttribute('data-remove-ingredient');
+    selectedIngredients = selectedIngredients.filter((item) => item.id !== ingredientId);
+    ingredientsDirty = true;
+    renderSelectedIngredients();
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!inputWrap) return;
+    if (!inputWrap.contains(event.target) && !suggestions.contains(event.target)) {
+      hideIngredientSuggestions();
+    }
+  });
+
+  renderSelectedIngredients();
 }
 
 async function loadRestaurants() {
@@ -275,10 +508,16 @@ async function loadProduct(id) {
     document.getElementById('product-price').value = product.price_kzt?.toString() || '';
     document.getElementById('product-station').value = product.station || 'HOT';
     document.getElementById('product-calories').value = product.calories || '';
-    document.getElementById('product-weight-grams').value = product.weight_grams || '';
-    const compositionText = (product.composition || []).join('\n');
-    document.getElementById('product-composition').value = compositionText;
-    updateCompositionPreview(compositionText);
+    document.getElementById('product-weight-grams').value = product.weight_grams || product.weightGrams || '';
+    initialComposition = Array.isArray(product.composition) ? product.composition : [];
+    ingredientsDirty = false;
+    selectedIngredients = (product.ingredients || [])
+      .map(mapIngredientFromApi)
+      .filter(Boolean)
+      .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+    renderSelectedIngredients();
+    clearIngredientInput();
+    updateIngredientInputState();
     document.getElementById('product-image').value = '';
     document.getElementById('product-images-preview').style.display = 'none';
     
@@ -362,14 +601,21 @@ function openProductModal() {
   document.getElementById('product-modifiers-section').style.display = 'none';
   document.getElementById('product-images-preview').style.display = 'none';
   document.getElementById('product-images-current').style.display = 'none';
-  updateCompositionPreview('');
+  ingredientsDirty = false;
+  initialComposition = [];
+  resetSelectedIngredients();
+  updateIngredientInputState();
   document.getElementById('product-modal').classList.add('active');
 }
 
 async function saveProduct() {
   try {
-    const compositionText = document.getElementById('product-composition').value.trim();
-    const composition = compositionText ? compositionText.split('\n').map(item => item.trim()).filter(item => item.length > 0) : undefined;
+    const shouldUpdateIngredients = !currentProductId || ingredientsDirty;
+    const composition = shouldUpdateIngredients
+      ? selectedIngredients
+          .map((ingredient) => getIngredientDisplayName(ingredient))
+          .filter((name) => name.length > 0)
+      : initialComposition;
     
     const caloriesValue = document.getElementById('product-calories').value.trim();
     const weightGramsValue = document.getElementById('product-weight-grams').value.trim();
@@ -420,6 +666,26 @@ async function saveProduct() {
       productId = response.data?.id || response.data?.data?.id;
       const imageCount = imageFiles.length > 0 ? ` с ${imageFiles.length} изображением(ями)` : '';
       Utils.showSuccess(`Продукт создан${imageCount}`);
+    }
+
+    if (!productId) {
+      Utils.showError('Не удалось определить продукт после сохранения');
+      return;
+    }
+
+    if (shouldUpdateIngredients) {
+      const ingredientPayload = selectedIngredients.map((ingredient, index) => ({
+        ingredientId: ingredient.id,
+        sortOrder: index,
+      }));
+
+      try {
+        await AdminAPI.setProductIngredients(productId, ingredientPayload);
+      } catch (error) {
+        console.error('Failed to update product ingredients:', error);
+        Utils.showError('Продукт сохранен, но состав не обновлен');
+        return;
+      }
     }
 
     closeProductModal();
@@ -525,7 +791,10 @@ function closeProductModal() {
   document.getElementById('product-modifiers-section').style.display = 'none';
   document.getElementById('product-images-preview').style.display = 'none';
   document.getElementById('product-images-current').style.display = 'none';
-  updateCompositionPreview('');
+  ingredientsDirty = false;
+  initialComposition = [];
+  resetSelectedIngredients();
+  updateIngredientInputState();
 }
 
 async function editProduct(id) {
@@ -568,4 +837,3 @@ Object.defineProperty(window, 'currentProductId', {
   get: function() { return currentProductId; },
   set: function(value) { currentProductId = value; }
 });
-

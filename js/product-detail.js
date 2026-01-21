@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Проверяем наличие сессии только если не публичный режим
   let sessionId = null;
   let tableToken = null;
+  let cartSocket = null;
   
   if (!isPublic) {
     sessionId = Utils.getSession();
@@ -65,6 +66,39 @@ document.addEventListener('DOMContentLoaded', async () => {
   let selectedQuantity = 1;
   const minQuantity = 1;
   const maxQuantity = 10;
+
+  function ensureCartBadgeWebSocket() {
+    if (isPublic || !sessionId) {
+      return;
+    }
+
+    if (!cartSocket) {
+      const serverUrl = CONFIG.API_BASE_URL;
+      cartSocket = new CartWebSocket(serverUrl, {
+        sessionId,
+        onCartUpdated: (payload) => {
+          if (!payload || payload.sessionId !== sessionId) {
+            return;
+          }
+          Utils.updateCartBadgeFromCart(payload.cart);
+        },
+        onCartCleared: (payload) => {
+          if (!payload || payload.sessionId !== sessionId) {
+            return;
+          }
+          Utils.updateCartBadgeFromCart({ items: [] });
+        },
+        onError: (error) => {
+          console.error('Cart WebSocket error:', error);
+        },
+      });
+    } else {
+      if (cartSocket.sessionId && cartSocket.sessionId !== sessionId) {
+        cartSocket.unsubscribeFromCart(cartSocket.sessionId);
+      }
+      cartSocket.subscribeToCart(sessionId);
+    }
+  }
 
   // Скрыть кнопку "Добавить в корзину" и корзину в публичном режиме
   if (isPublic) {
@@ -207,6 +241,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const cartResult = await API.createCart(tableToken);
             sessionId = cartResult.sessionId;
             Utils.saveSession(sessionId, tableToken);
+            ensureCartBadgeWebSocket();
             
             // Восстанавливаем сохраненное количество гостей
             const savedGuestsCount = localStorage.getItem('guests_count');
@@ -316,6 +351,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateQuantityDisplay();
     // Инициализировать счетчик корзины при загрузке (только в обычном режиме)
   Utils.updateCartBadge();
+  ensureCartBadgeWebSocket();
   }
 
   /**
@@ -677,4 +713,3 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
 });
-
