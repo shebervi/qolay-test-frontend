@@ -112,6 +112,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       const quantity = item.quantity || 1;
       const itemTotal = price * quantity;
 
+      const variantName = item.variantName?.ru || item.variantName?.kk || item.variantName?.en;
+      const variantLabel = variantName || '';
+      const variantHtml = variantLabel
+        ? `
+          <div style="font-size: 12px; color: #666; margin-top: 4px;">
+            Вариант: ${Utils.escapeHtml(variantLabel)}
+          </div>
+        `
+        : '';
+
       let modifiersHtml = '';
       if (item.modifiers && item.modifiers.length > 0) {
         const modifiersList = item.modifiers.map(mod => {
@@ -130,6 +140,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #eee;">
           <div style="flex: 1;">
             <div style="font-weight: 500;">${Utils.escapeHtml(productName)}</div>
+            ${variantHtml}
             ${modifiersHtml}
             <div style="font-size: 12px; color: #666; margin-top: 4px;">
               ${Utils.formatPrice(price)} ₸ × ${quantity}

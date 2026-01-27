@@ -507,6 +507,54 @@ body {
   margin-bottom: 32px;
 }
 
+.product-variants {
+  margin: 0 0 24px;
+}
+
+.product-variants-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--secondary-color);
+  margin-bottom: 10px;
+}
+
+.product-variants-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.variant-btn {
+  padding: 8px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--background-secondary);
+  color: var(--primary-color);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  box-shadow: var(--shadow);
+}
+
+.variant-btn:hover {
+  border-color: var(--primary-color);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.variant-btn.active {
+  background: var(--primary-color);
+  color: var(--background-color);
+  border-color: var(--primary-color);
+  cursor: default;
+  box-shadow: var(--shadow-md);
+}
+
+.variant-btn:disabled {
+  opacity: 1;
+}
+
 .quantity-selector {
   display: flex;
   align-items: center;

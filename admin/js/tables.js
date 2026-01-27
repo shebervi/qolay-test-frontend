@@ -10,6 +10,7 @@ let restaurants = [];
 let currentUser = null;
 let currentView = 'tables'; // 'tables' или 'reservations'
 let tableReservationsMap = {};
+let availableWaitersByRestaurant = {};
 
 document.addEventListener('DOMContentLoaded', async () => {
   // Получаем текущего пользователя
@@ -127,6 +128,11 @@ async function loadTables(restaurantId = null) {
         .slice()
         .sort((a, b) => new Date(a.reservation_date) - new Date(b.reservation_date));
       const reservationCount = reservations.length;
+      const waiterName =
+        table.current_waiter?.account?.name ||
+        table.current_waiter?.account?.username ||
+        table.current_waiter?.account?.phone ||
+        null;
       const reservationTime = reservationCount === 1
         ? new Date(reservations[0].reservation_date).toLocaleString('ru-RU', {
             day: '2-digit',
@@ -155,6 +161,17 @@ async function loadTables(restaurantId = null) {
                 <option value="RESERVED" ${table.status === 'RESERVED' ? 'selected' : ''}>Зарезервирован</option>
               </select>
             </div>
+          </td>
+          <td>
+            ${waiterName ? `
+              <button class="btn-link" onclick="openTableWaiterModal('${table.id}', '${table.number}', '${encodeURIComponent(waiterName)}', '${table.current_waiter?.id || ''}', '${table.restaurant_id}')" style="color: #2c5cc5; font-weight: 500; text-decoration: none; background: none; border: none; padding: 0; cursor: pointer;">
+                ${Utils.escapeHtml(waiterName)}
+              </button>
+            ` : `
+              <button class="btn-link" onclick="openTableWaiterModal('${table.id}', '${table.number}', '${encodeURIComponent('Не назначен')}', '', '${table.restaurant_id}')" style="color: #999; font-weight: 500; text-decoration: none; background: none; border: none; padding: 0; cursor: pointer;">
+                Не назначен
+              </button>
+            `}
           </td>
           <td>
             ${reservationCount === 1 ? `
@@ -201,6 +218,7 @@ async function loadTables(restaurantId = null) {
           <tr>
             <th>№ стола</th>
             <th>Статус</th>
+            <th>Официант</th>
             <th>Брони</th>
             <th>Дата продления QR-кода</th>
             <th>Действия</th>
@@ -1005,6 +1023,100 @@ function closeTableReservationsModal() {
   modal.classList.remove('active');
 }
 
+async function openTableWaiterModal(tableId, tableNumber, waiterName, waiterId, restaurantId) {
+  const modal = document.getElementById('table-waiter-modal');
+  const title = document.getElementById('table-waiter-title');
+  const content = document.getElementById('table-waiter-content');
+  const restaurantFilter = document.getElementById('restaurant-filter')?.value || '';
+  const restaurantToUse = restaurantId || restaurantFilter;
+  const decodedWaiterName = decodeURIComponent(waiterName || '');
+
+  modal.classList.add('active');
+  title.textContent = `Стол №${tableNumber}`;
+  content.innerHTML = '<div class="loading">Загрузка...</div>';
+
+  try {
+    const waiters = await loadAvailableWaiters(restaurantToUse);
+    const options = waiters
+      .map((waiter) => {
+        const label = waiter.name || waiter.username || waiter.phone || 'Без имени';
+        const selected = waiter.id === waiterId ? 'selected' : '';
+        return `<option value="${waiter.id}" ${selected}>${Utils.escapeHtml(label)}</option>`;
+      })
+      .join('');
+    const currentWaiter = waiters.find((waiter) => waiter.id === waiterId);
+    const currentWaiterName =
+      currentWaiter?.name || currentWaiter?.username || currentWaiter?.phone || decodedWaiterName;
+    const currentWaiterPhone = currentWaiter?.phone || '';
+    const currentWaiterUsername = currentWaiter?.username || '';
+
+    content.innerHTML = `
+      <div class="form-group">
+        <label>Текущий официант</label>
+        <input type="text" class="input" value="${Utils.escapeHtml(currentWaiterName)}" disabled>
+        ${currentWaiterPhone || currentWaiterUsername ? `
+          <div style="margin-top: 8px; color: #666; font-size: 0.9em;">
+            ${currentWaiterUsername ? `<div>Username: ${Utils.escapeHtml(currentWaiterUsername)}</div>` : ''}
+            ${currentWaiterPhone ? `<div>Телефон: ${Utils.escapeHtml(currentWaiterPhone)}</div>` : ''}
+          </div>
+        ` : ''}
+      </div>
+      <div class="form-group">
+        <label>Назначить другого официанта</label>
+        <select id="table-waiter-select" class="input">
+          <option value="">Выберите официанта</option>
+          ${options}
+        </select>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="saveTableWaiter('${tableId}')">Назначить</button>
+        <button class="btn btn-secondary" onclick="closeTableWaiterModal()">Отмена</button>
+      </div>
+    `;
+  } catch (error) {
+    console.error('Failed to load waiters:', error);
+    content.innerHTML = '<div class="empty-state">Не удалось загрузить список официантов.</div>';
+  }
+}
+
+function closeTableWaiterModal() {
+  const modal = document.getElementById('table-waiter-modal');
+  modal.classList.remove('active');
+}
+
+async function loadAvailableWaiters(restaurantId) {
+  const cacheKey = restaurantId || 'all';
+  if (availableWaitersByRestaurant[cacheKey]) {
+    return availableWaitersByRestaurant[cacheKey];
+  }
+
+  const response = await AdminAPI.getWaiters(restaurantId || null);
+  const result = response.data || response;
+  const waiters = result.data || result || [];
+  availableWaitersByRestaurant[cacheKey] = waiters;
+  return waiters;
+}
+
+async function saveTableWaiter(tableId) {
+  const select = document.getElementById('table-waiter-select');
+  const waiterId = select?.value;
+
+  if (!waiterId) {
+    Utils.showError('Выберите официанта');
+    return;
+  }
+
+  try {
+    await AdminAPI.assignTableWaiter(tableId, waiterId);
+    Utils.showSuccess('Официант назначен');
+    closeTableWaiterModal();
+    await loadTables(document.getElementById('restaurant-filter')?.value || null);
+  } catch (error) {
+    console.error('Failed to assign waiter to table:', error);
+    Utils.showError('Не удалось назначить официанта: ' + (error.message || 'Неизвестная ошибка'));
+  }
+}
+
 /**
  * Закрыть модальное окно с информацией о брони
  */
@@ -1179,6 +1291,9 @@ window.toggleStatusSelect = toggleStatusSelect;
 window.openReservationDetailsModal = openReservationDetailsModal;
 window.openTableReservationsModal = openTableReservationsModal;
 window.closeTableReservationsModal = closeTableReservationsModal;
+window.openTableWaiterModal = openTableWaiterModal;
+window.closeTableWaiterModal = closeTableWaiterModal;
+window.saveTableWaiter = saveTableWaiter;
 window.closeReservationDetailsModal = closeReservationDetailsModal;
 window.openEditReservationModal = openEditReservationModal;
 window.confirmReservationFromDetails = confirmReservationFromDetails;

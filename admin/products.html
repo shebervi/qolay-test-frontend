@@ -174,9 +174,15 @@
               <p style="font-size: 12px; color: #666; margin-top: 4px;">Энергетическая ценность продукта</p>
             </div>
             <div class="form-group">
-              <label for="product-weight-grams">Вес (граммы)</label>
-              <input type="number" id="product-weight-grams" step="1" min="0" placeholder="Например: 360">
-              <p style="font-size: 12px; color: #666; margin-top: 4px;">Вес порции в граммах</p>
+              <label for="product-size-value">Вес/объем</label>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="number" id="product-size-value" step="1" min="0" placeholder="Например: 300" style="flex: 1;">
+                <select id="product-size-unit" style="width: 110px;">
+                  <option value="GRAM">гр</option>
+                  <option value="ML">мл</option>
+                </select>
+              </div>
+              <p style="font-size: 12px; color: #666; margin-top: 4px;">Укажите размер порции и единицу измерения</p>
             </div>
           </div>
 
@@ -209,6 +215,54 @@
           <button type="button" class="btn btn-secondary" onclick="closeProductModal()">Отмена</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Modal для вариантов продукта -->
+  <div id="product-variants-modal" class="modal">
+    <div class="modal-content" style="max-width: 700px;">
+      <div class="modal-header">
+        <h3 id="product-variants-title">Варианты продукта</h3>
+        <button class="modal-close" onclick="closeProductVariantsModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="product-variants-list-container" style="margin-bottom: 16px;">
+          <div class="loading">Загрузка...</div>
+        </div>
+        <form id="product-variant-form" class="admin-form">
+          <input type="hidden" id="product-variant-id" />
+          <div class="form-group">
+            <label>Название (RU)</label>
+            <input id="product-variant-name-ru" class="input" required />
+          </div>
+          <div class="form-group">
+            <label>Название (KK)</label>
+            <input id="product-variant-name-kk" class="input" required />
+          </div>
+          <div class="form-group">
+            <label>Название (EN)</label>
+            <input id="product-variant-name-en" class="input" required />
+          </div>
+          <div class="form-group">
+            <label>Цена (₸)</label>
+            <input id="product-variant-price" class="input" required />
+          </div>
+          <div class="form-group">
+            <label>Сортировка</label>
+            <input id="product-variant-sort" class="input" type="number" value="0" />
+          </div>
+          <div class="form-group">
+            <label style="display: inline-flex; align-items: center; gap: 8px;">
+              <input id="product-variant-active" type="checkbox" checked />
+              Активен
+            </label>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Сохранить вариант</button>
+            <button type="button" class="btn btn-secondary" onclick="resetProductVariantForm()">Очистить</button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 

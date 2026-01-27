@@ -6,6 +6,9 @@ let currentManagerId = null;
 let currentWaiterId = null;
 let restaurants = [];
 let currentUser = null;
+let currentWaiterAssignId = null;
+let cachedTablesByRestaurant = {};
+let cachedWaiters = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
   // Получаем текущего пользователя
@@ -163,6 +166,19 @@ async function loadWaiters() {
     const response = await AdminAPI.getWaiters(restaurantId);
     const result = response.data || response;
     const waiters = result.data || result || [];
+    cachedWaiters = waiters;
+
+    const restaurantIds = Array.from(
+      new Set(
+        waiters
+          .map((waiter) => waiter.restaurant?.id)
+          .filter((id) => !!id),
+      ),
+    );
+    const tablesByRestaurant = {};
+    for (const id of restaurantIds) {
+      tablesByRestaurant[id] = await loadTablesForRestaurant(id);
+    }
     
     const container = document.getElementById('waiters-list');
     
@@ -173,6 +189,16 @@ async function loadWaiters() {
 
     container.innerHTML = waiters.map(waiter => {
       const restaurant = restaurants.find(r => r.id === waiter.restaurant?.id);
+      const tables = waiter.restaurant?.id
+        ? tablesByRestaurant[waiter.restaurant.id] || []
+        : [];
+      const assignedTables = tables
+        .filter((table) => table.current_waiter?.id === waiter.id)
+        .map((table) => table.number)
+        .sort((a, b) => a - b);
+      const assignedTablesText = assignedTables.length > 0
+        ? assignedTables.map((num) => `№${num}`).join(', ')
+        : 'Не назначены';
       
       return `
         <div class="list-item">
@@ -180,8 +206,12 @@ async function loadWaiters() {
             <h4>${waiter.name || waiter.username || 'Без имени'}</h4>
             <p>${waiter.username || waiter.phone}</p>
             <p style="color: #666; font-size: 0.9em;">${restaurant?.name || 'Ресторан не найден'}</p>
+            <p style="color: #666; font-size: 0.9em;">Столы: ${assignedTablesText}</p>
           </div>
           <div class="list-item-actions">
+            <button class="btn btn-sm btn-secondary" onclick="openAssignTablesModal('${waiter.id}')" title="Назначить столы">
+              Назначить столы
+            </button>
             <button class="btn-icon" onclick="editWaiter('${waiter.id}')" title="Редактировать">
               <i class="fas fa-edit"></i>
             </button>
@@ -195,6 +225,92 @@ async function loadWaiters() {
   } catch (error) {
     console.error('Failed to load waiters:', error);
     Utils.showError('Не удалось загрузить официантов');
+  }
+}
+
+async function openAssignTablesModal(waiterId) {
+  currentWaiterAssignId = waiterId;
+  const modal = document.getElementById('waiter-assign-tables-modal');
+  const content = document.getElementById('waiter-assign-tables-content');
+  const waiter = cachedWaiters.find((item) => item.id === waiterId);
+  const restaurantId = waiter?.restaurant?.id || document.getElementById('restaurant-filter')?.value || '';
+
+  modal.classList.add('active');
+  content.innerHTML = '<div class="loading">Загрузка...</div>';
+
+  try {
+    const tables = await loadTablesForRestaurant(restaurantId);
+
+    if (!tables || tables.length === 0) {
+      content.innerHTML = '<div class="empty-state">Нет столов для назначения.</div>';
+      return;
+    }
+
+    content.innerHTML = `
+      <div class="form-group">
+        <label>Выберите столы</label>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px;">
+          ${tables.map(table => `
+            <label style="display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid #e5e7eb; border-radius: 8px; cursor: pointer;">
+              <input type="checkbox" value="${table.id}">
+              <span>Стол №${table.number}</span>
+            </label>
+          `).join('')}
+        </div>
+      </div>
+      <div class="form-actions" style="margin-top: 16px;">
+        <button class="btn btn-primary" onclick="saveAssignedTables()">Назначить</button>
+        <button class="btn btn-secondary" onclick="closeAssignTablesModal()">Отмена</button>
+      </div>
+    `;
+  } catch (error) {
+    console.error('Failed to load tables for assignment:', error);
+    content.innerHTML = '<div class="empty-state">Не удалось загрузить столы.</div>';
+  }
+}
+
+function closeAssignTablesModal() {
+  const modal = document.getElementById('waiter-assign-tables-modal');
+  modal.classList.remove('active');
+  currentWaiterAssignId = null;
+}
+
+async function loadTablesForRestaurant(restaurantId) {
+  const cacheKey = restaurantId || 'all';
+  if (cachedTablesByRestaurant[cacheKey]) {
+    return cachedTablesByRestaurant[cacheKey];
+  }
+
+  const response = await AdminAPI.getTables(restaurantId || null);
+  const tables = response.data?.data || response.data || [];
+  cachedTablesByRestaurant[cacheKey] = tables;
+  return tables;
+}
+
+async function saveAssignedTables() {
+  const content = document.getElementById('waiter-assign-tables-content');
+  const selected = Array.from(content.querySelectorAll('input[type="checkbox"]:checked'))
+    .map((input) => input.value);
+
+  if (!currentWaiterAssignId) {
+    Utils.showError('Официант не выбран');
+    return;
+  }
+
+  if (selected.length === 0) {
+    Utils.showError('Выберите хотя бы один стол');
+    return;
+  }
+
+  try {
+    await Promise.all(
+      selected.map((tableId) => AdminAPI.assignTableWaiter(tableId, currentWaiterAssignId)),
+    );
+    Utils.showSuccess('Столы назначены');
+    closeAssignTablesModal();
+  } catch (error) {
+    console.error('Failed to assign tables:', error);
+    Utils.showError('Не удалось назначить столы: ' + (error.message || 'Неизвестная ошибка'));
   }
 }
 
@@ -423,3 +539,7 @@ async function saveKitchenPassword() {
     Utils.showError(error.message || 'Не удалось установить пароль кухни');
   }
 }
+
+window.openAssignTablesModal = openAssignTablesModal;
+window.closeAssignTablesModal = closeAssignTablesModal;
+window.saveAssignedTables = saveAssignedTables;

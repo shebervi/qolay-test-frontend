@@ -855,6 +855,7 @@ function renderKanbanCard(order) {
   const createdAt = new Date(order.created_at);
   const timeStr = createdAt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
   const dateStr = createdAt.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' });
+  const waiterName = order.waiter?.account?.name || order.waiter?.account?.username || order.waiter?.account?.phone || 'Не назначен';
   
   // Получаем первые несколько товаров
   const items = order.items || [];
@@ -877,6 +878,9 @@ function renderKanbanCard(order) {
         <div class="kanban-card-time">${dateStr} ${timeStr}</div>
         <div class="kanban-card-info-item">
           <strong>Гость:</strong> ${Utils.escapeHtml(order.guest_name || 'Не указано')}
+        </div>
+        <div class="kanban-card-info-item">
+          <strong>Официант:</strong> ${Utils.escapeHtml(waiterName)}
         </div>
         <div class="kanban-card-info-item">
           <strong>Оплата:</strong> ${getPaymentMethodLabel(order.payment_method)}
@@ -930,6 +934,8 @@ async function showOrderDetails(orderId) {
 
     const itemsHtml = order.items?.map((item, index) => {
       const itemName = item.snapshot_name_ru || item.snapshot_name_kk || item.snapshot_name_en || 'Товар';
+      const variantName = item.snapshot_variant_name_ru || item.snapshot_variant_name_kk || item.snapshot_variant_name_en;
+      const variantLabel = variantName || '';
       const unitPrice = parseFloat(item.unit_price_kzt || 0);
       const qty = item.qty || 1;
       const lineTotal = parseFloat(item.line_total_kzt || 0);
@@ -954,6 +960,7 @@ async function showOrderDetails(orderId) {
               <span class="order-item-qty">${qty}×</span>
               <span class="order-item-name-new">${Utils.escapeHtml(itemName)}</span>
             </div>
+            ${variantLabel ? `<div class="order-item-modifiers-new">Вариант: ${Utils.escapeHtml(variantLabel)}</div>` : ''}
             ${modifiersHtml}
             </div>
           <div class="order-item-right">
@@ -971,6 +978,7 @@ async function showOrderDetails(orderId) {
     const createdAtDate = new Date(order.created_at);
     const dateStr = createdAtDate.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' });
     const timeStr = createdAtDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    const waiterName = order.waiter?.account?.name || order.waiter?.account?.username || order.waiter?.account?.phone || 'Не назначен';
 
     details.innerHTML = `
       <div class="order-details-new" data-order-id="${order.id}">
@@ -979,6 +987,7 @@ async function showOrderDetails(orderId) {
             <h3 class="order-details-title">Детали заказа</h3>
             <div class="order-table-info">Стол № ${order.table?.number || order.snapshot_table_number || 'N/A'}</div>
             <div class="order-date-time">${dateStr} ${timeStr}</div>
+            <div class="order-date-time">Официант: ${Utils.escapeHtml(waiterName)}</div>
             </div>
           <div class="order-details-header-right">
             <span class="order-status-badge-new" id="order-status-badge-${order.id}" style="background: ${statusMeta.color};">

@@ -196,6 +196,13 @@ async function adminUpdateTableStatus(id, status) {
   });
 }
 
+async function adminAssignTableWaiter(id, waiterId) {
+  return apiRequest(`/admin/tables/${id}/assign-waiter`, {
+    method: 'PATCH',
+    body: JSON.stringify({ waiterId }),
+  });
+}
+
 /**
  * Категории
  */
@@ -312,6 +319,29 @@ async function adminUpdateProduct(id, data) {
   });
 }
 
+async function adminGetProductVariants(productId) {
+  return apiRequest(`/admin/products/${productId}/variants`);
+}
+
+async function adminCreateProductVariant(productId, data) {
+  return apiRequest(`/admin/products/${productId}/variants`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+async function adminUpdateProductVariant(variantId, data) {
+  return apiRequest(`/admin/variants/${variantId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+async function adminDeleteProductVariant(variantId) {
+  return apiRequest(`/admin/variants/${variantId}`, {
+    method: 'DELETE',
+  });
+}
 async function adminDeleteProduct(id) {
   return apiRequest(`/products/${id}`, {
     method: 'DELETE',
@@ -890,6 +920,7 @@ if (typeof window !== 'undefined') {
     downloadAllQR: adminDownloadAllQR,
     rotateQRToken: adminRotateQRToken,
     updateTableStatus: adminUpdateTableStatus,
+    assignTableWaiter: adminAssignTableWaiter,
     // Categories
     getCategories: adminGetCategories,
     getCategory: adminGetCategory,
@@ -901,9 +932,14 @@ if (typeof window !== 'undefined') {
     getProduct: adminGetProduct,
     createProduct: adminCreateProduct,
     updateProduct: adminUpdateProduct,
+    getProductVariants: adminGetProductVariants,
+    createProductVariant: adminCreateProductVariant,
+    updateProductVariant: adminUpdateProductVariant,
+    deleteProductVariant: adminDeleteProductVariant,
     deleteProduct: adminDeleteProduct,
     uploadProductImage: adminUploadProductImage,
     deleteProductImage: adminDeleteProductImage,
+    // Product Families
     // Ingredients
     searchIngredients: adminSearchIngredients,
     getIngredients: adminGetIngredients,

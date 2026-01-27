@@ -56,13 +56,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  listContainer.addEventListener('change', async (event) => {
-    const allergenToggle = event.target.closest('[data-allergen-toggle]');
-    if (!allergenToggle) return;
-    const ingredientId = allergenToggle.getAttribute('data-allergen-toggle');
-    await toggleIngredientAllergen(ingredientId, allergenToggle.checked);
-  });
-
   await loadIngredients();
 });
 
@@ -116,7 +109,7 @@ function renderEmptyState(message) {
   const container = document.getElementById('ingredients-list');
   container.innerHTML = `
     <tr>
-      <td colspan="6">
+      <td colspan="5">
         <div class="empty-state">${message}</div>
       </td>
     </tr>
@@ -139,22 +132,11 @@ function renderIngredients(items) {
     const nameRu = ingredient.name_ru || '';
     const nameKk = ingredient.name_kk || '—';
     const nameEn = ingredient.name_en || '—';
-    const allergenBadge = ingredient.is_allergen
-      ? '<span class="ingredient-allergen">Аллерген</span>'
-      : '';
-
     return `
       <tr>
         <td>${Utils.escapeHtml(nameRu)}</td>
         <td>${Utils.escapeHtml(nameKk)}</td>
         <td>${Utils.escapeHtml(nameEn)}</td>
-        <td>
-          ${allergenBadge}
-          <label class="ingredient-allergen-toggle">
-            <input type="checkbox" data-allergen-toggle="${ingredient.id}" ${ingredient.is_allergen ? 'checked' : ''}>
-            Аллерген
-          </label>
-        </td>
         <td>${Utils.escapeHtml(restaurant?.name || 'Ресторан не найден')}</td>
         <td class="ingredient-table-actions">
           <button class="btn btn-secondary ingredient-translate-btn" data-translate-ingredient="${ingredient.id}">
@@ -196,7 +178,6 @@ function fillIngredientForm(ingredient) {
   document.getElementById('ingredient-name-ru').value = ingredient.name_ru || '';
   document.getElementById('ingredient-name-kk').value = ingredient.name_kk || '';
   document.getElementById('ingredient-name-en').value = ingredient.name_en || '';
-  document.getElementById('ingredient-is-allergen').checked = Boolean(ingredient.is_allergen);
   document.getElementById('ingredient-modal-title').textContent = 'Редактировать ингредиент';
 }
 
@@ -217,7 +198,6 @@ async function saveIngredient() {
       nameRu: document.getElementById('ingredient-name-ru').value,
       nameKk: document.getElementById('ingredient-name-kk').value || undefined,
       nameEn: document.getElementById('ingredient-name-en').value || undefined,
-      isAllergen: document.getElementById('ingredient-is-allergen').checked,
     };
 
     if (currentIngredientId) {
@@ -264,37 +244,12 @@ async function translateIngredientCard(id) {
       nameRu: ingredient.name_ru,
       nameKk: ingredient.name_kk || ingredient.name_ru,
       nameEn: ingredient.name_en || ingredient.name_ru,
-      isAllergen: ingredient.is_allergen,
     });
     Utils.showSuccess('Перевод обновлен');
     await loadIngredients();
   } catch (error) {
     console.error('Failed to translate ingredient:', error);
     Utils.showError('Не удалось перевести ингредиент');
-  }
-}
-
-async function toggleIngredientAllergen(id, isAllergen) {
-  const ingredient = ingredientResults.find((item) => item.id === id);
-  if (!ingredient) {
-    Utils.showError('Не удалось найти ингредиент');
-    return;
-  }
-
-  try {
-    await AdminAPI.updateIngredient(id, {
-      restaurantId: ingredient.restaurant_id,
-      nameRu: ingredient.name_ru,
-      nameKk: ingredient.name_kk || undefined,
-      nameEn: ingredient.name_en || undefined,
-      isAllergen,
-    });
-    ingredient.is_allergen = isAllergen;
-    Utils.showSuccess('Аллерген обновлен');
-  } catch (error) {
-    console.error('Failed to update allergen:', error);
-    Utils.showError('Не удалось обновить аллерген');
-    await loadIngredients();
   }
 }
 
@@ -335,7 +290,6 @@ async function translateMissingIngredients() {
         nameRu: item.name_ru,
         nameKk: item.name_kk || item.name_ru,
         nameEn: item.name_en || item.name_ru,
-        isAllergen: item.is_allergen,
       });
     }
     Utils.showSuccess('Переводы заполнены');

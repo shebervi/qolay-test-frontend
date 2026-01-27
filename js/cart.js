@@ -152,6 +152,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     const images = item.images || [];
     const imageUrl = Utils.getProductImageUrl(images, item.productId, 0);
 
+    const variantName = item.variantName?.ru || item.variantName?.kk || item.variantName?.en;
+    const variantLabel = variantName || '';
+    const variantHtml = variantLabel
+      ? `
+        <div class="cart-item-modifiers" style="font-size: 12px; color: #666; margin-top: 4px;">
+          Вариант: ${Utils.escapeHtml(variantLabel)}
+        </div>
+      `
+      : '';
+
     // Формируем информацию о модификаторах
     let modifiersHtml = '';
     if (item.modifiers && item.modifiers.length > 0) {
@@ -189,6 +199,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       ${imageHtml}
       <div class="cart-item-info">
         <div class="cart-item-name">${Utils.escapeHtml(productName)}</div>
+        ${variantHtml}
         ${modifiersHtml}
         ${nutritionInfoHtml}
         ${compositionHtml}

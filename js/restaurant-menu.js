@@ -208,18 +208,42 @@ document.addEventListener('DOMContentLoaded', async () => {
     const imageUrl = Utils.getProductImageUrl(imageData, product.id, 0);
     const name = Utils.getProductName(product.name);
     const description = Utils.getProductDescription(product.description);
-    const price = Utils.formatPrice(product.price);
+    const variants = product.variants || [];
+    const hasVariants = variants.length > 0;
+    const minVariantPrice = hasVariants
+      ? Math.min(...variants.map((variant) => parseFloat(variant.price || 0)))
+      : null;
+    const priceValue = hasVariants && Number.isFinite(minVariantPrice)
+      ? minVariantPrice
+      : parseFloat(product.price || 0);
+    const price = Utils.formatPrice(priceValue);
+    const pricePrefix = hasVariants ? 'от ' : '';
     const currency = menuData?.restaurant?.currency === 'KZT' ? '₸' : menuData?.restaurant?.currency || '₸';
+    const ratingAverage =
+      product.ratingAverage !== null && product.ratingAverage !== undefined
+        ? product.ratingAverage
+        : null;
+    const reviewsCount =
+      product.reviewsCount !== null && product.reviewsCount !== undefined
+        ? product.reviewsCount
+        : null;
+    const ratingLabel =
+      ratingAverage !== null
+        ? reviewsCount
+          ? `${ratingAverage.toFixed(1)} (${reviewsCount})`
+          : ratingAverage.toFixed(1)
+        : null;
 
     card.innerHTML = `
       <div class="product-image-container">
         <img src="${imageUrl}" alt="${name}" class="product-image" onerror="this.src='https://openlab.citytech.cuny.edu/chenry-eportfolio/wp-content/themes/koji/assets/images/default-fallback-image.png'" />
+        ${ratingLabel ? `<div class="product-rating">${ratingLabel}</div>` : ''}
       </div>
       <div class="product-info">
         <h3 class="product-name">${name}</h3>
         <p class="product-description">${description || 'Описание отсутствует'}</p>
         <div class="product-footer">
-          <span class="product-price">${price} ${currency}</span>
+          <span class="product-price">${pricePrefix}${price} ${currency}</span>
         </div>
       </div>
     `;
@@ -784,4 +808,3 @@ document.addEventListener('DOMContentLoaded', () => {
 window.openReservationModal = openReservationModal;
 window.closeReservationModal = closeReservationModal;
 window.selectReservationTable = selectReservationTable;
-

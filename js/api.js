@@ -168,13 +168,21 @@ async function getCart(sessionId) {
  * @param {string} productId - ID продукта
  * @param {number} quantity - Количество
  * @param {Array} modifiers - Выбранные модификаторы [{groupId: string, optionIds: string[]}]
+ * @param {string} productVariantId - ID варианта продукта (опционально)
  * @returns {Promise<object>}
  */
-async function addToCart(sessionId, productId, quantity = 1, modifiers = []) {
+async function addToCart(
+  sessionId,
+  productId,
+  quantity = 1,
+  modifiers = [],
+  productVariantId,
+) {
   const response = await apiRequest(`/public/cart/${sessionId}/items`, {
     method: 'POST',
     body: JSON.stringify({ 
       productId, 
+      productVariantId,
       quantity,
       modifiers: modifiers.length > 0 ? modifiers : undefined,
     }),

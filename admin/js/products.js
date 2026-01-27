@@ -3,6 +3,8 @@
  */
 
 let currentProductId = null;
+let currentVariantsProductId = null;
+let currentProductVariants = [];
 let restaurants = [];
 let categories = [];
 let currentUser = null;
@@ -12,6 +14,9 @@ let activeIngredientQuery = '';
 let ingredientSuggestions = [];
 let ingredientsDirty = false;
 let initialComposition = [];
+let productVariantsByProductId = {};
+let draggingVariantId = null;
+let draggingProductId = null;
 
 // Безопасный доступ к Utils
 const Utils = window.Utils || {
@@ -35,6 +40,43 @@ const Utils = window.Utils || {
     alert('Успешно: ' + msg);
   },
 };
+
+function resolveProductSize(product) {
+  const sizeUnit =
+    product.size_unit ||
+    product.sizeUnit ||
+    (product.volume_ml || product.volumeMl ? 'ML' : undefined) ||
+    (product.weight_grams || product.weightGrams ? 'GRAM' : null);
+  const sizeValue =
+    product.sizeValue ??
+    (sizeUnit === 'ML'
+      ? product.volume_ml || product.volumeMl
+      : sizeUnit === 'GRAM'
+        ? product.weight_grams || product.weightGrams
+        : null);
+
+  if (!sizeUnit || sizeValue === null || sizeValue === undefined) {
+    return null;
+  }
+
+  return { unit: sizeUnit, value: sizeValue };
+}
+
+function formatSizeLabel(size) {
+  if (!size) return '';
+  if (size.unit === 'ML') {
+    if (size.value >= 1000) {
+      const liters = (size.value / 1000).toFixed(2).replace(/\.?0+$/, '');
+      return `${liters} л`;
+    }
+    return `${size.value} мл`;
+  }
+  if (size.value >= 1000) {
+    const kilos = (size.value / 1000).toFixed(2).replace(/\.?0+$/, '');
+    return `${kilos} кг`;
+  }
+  return `${size.value} г`;
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
   // Получаем текущего пользователя
@@ -77,6 +119,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     e.preventDefault();
     await saveProduct();
   });
+
+  const variantForm = document.getElementById('product-variant-form');
+  if (variantForm) {
+    variantForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await saveProductVariant();
+    });
+  }
 
   setupIngredientControls();
   updateIngredientInputState();
@@ -166,7 +216,6 @@ function mapIngredientFromApi(item) {
     nameRu: item.nameRu || item.name_ru || item.name?.ru || '',
     nameKk: item.nameKk || item.name_kk || item.name?.kk || null,
     nameEn: item.nameEn || item.name_en || item.name?.en || null,
-    isAllergen: item.isAllergen ?? item.is_allergen ?? false,
     sortOrder: item.sortOrder ?? item.sort_order ?? 0,
   };
 }
@@ -422,6 +471,7 @@ async function loadProducts(restaurantId = null, categoryId = null) {
   try {
     const response = await AdminAPI.getProducts(restaurantId, categoryId);
     const products = response.data || [];
+    productVariantsByProductId = {};
     
     const container = document.getElementById('products-list');
     
@@ -434,6 +484,7 @@ async function loadProducts(restaurantId = null, categoryId = null) {
     const canEditProduct = currentUser?.role !== 'WAITER' && currentUser?.role !== 'KITCHEN';
     const canDeleteProduct = currentUser?.role !== 'WAITER' && currentUser?.role !== 'KITCHEN';
     const canManageModifiers = currentUser?.role !== 'WAITER' && currentUser?.role !== 'KITCHEN';
+    const canManageVariants = currentUser?.role !== 'WAITER' && currentUser?.role !== 'KITCHEN';
 
     container.innerHTML = products.map(product => {
       const restaurant = restaurants.find(r => r.id === product.restaurant_id);
@@ -450,21 +501,92 @@ async function loadProducts(restaurantId = null, categoryId = null) {
       if (product.calories) {
         nutritionInfo.push(`🔥 ${product.calories} ккал`);
       }
-      if (product.weight_grams) {
-        nutritionInfo.push(`⚖️ ${product.weight_grams} г`);
+      const size = resolveProductSize(product);
+      if (size) {
+        nutritionInfo.push(`⚖️ ${formatSizeLabel(size)}`);
       }
       if (product.composition && product.composition.length > 0) {
         nutritionInfo.push(`📋 ${product.composition.length} ингр.`);
       }
-      
+
+      const variants = Array.isArray(product.variants) ? product.variants : [];
+      productVariantsByProductId[product.id] = variants;
+      const variantsPreview = variants.length > 0
+        ? `
+          <div style="margin-top: 6px;">
+            <button
+              type="button"
+              class="btn-link"
+              onclick="toggleProductVariantsPreview('${product.id}')"
+              data-toggle-product-variants="${product.id}"
+              style="padding: 0; background: none; border: none; color: var(--primary-color); font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;"
+            >
+              <span style="display: inline-block; transform: rotate(0deg);" data-toggle-icon="${product.id}">▾</span>
+              Варианты (${variants.length})
+            </button>
+            <div id="product-variants-preview-${product.id}" data-variants-preview="${product.id}" style="margin-top: 8px; display: none;">
+              ${variants
+                .slice()
+                .sort((a, b) => {
+                  const aOrder = a.sort_order ?? a.sortOrder ?? 0;
+                  const bOrder = b.sort_order ?? b.sortOrder ?? 0;
+                  if (aOrder !== bOrder) return aOrder - bOrder;
+                  const aName = (a.name_ru || a.name_kk || a.name_en || '').toString();
+                  const bName = (b.name_ru || b.name_kk || b.name_en || '').toString();
+                  return aName.localeCompare(bName, 'ru');
+                })
+                .map((variant) => {
+                  const variantName = variant.name_ru || variant.name_kk || variant.name_en || 'Без названия';
+                  const variantPrice = variant.price_kzt ?? variant.priceKzt ?? variant.price;
+                  const label = variantName;
+                  return `
+                    <div class="variant-card" draggable="true" data-variant-id="${variant.id}" data-product-id="${product.id}" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid #eee; border-radius: 10px; background: #fafafa; margin-bottom: 8px; cursor: grab;">
+                      <div style="font-size: 13px; color: #333;">
+                        ${Utils.escapeHtml(label)}${variantPrice ? ` • ${Utils.formatPrice(variantPrice)} ₸` : ''}
+                      </div>
+                      <div style="display: flex; gap: 10px; align-items: center;">
+                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #555; cursor: pointer;">
+                          <input type="checkbox" ${variant.is_active !== false ? 'checked' : ''} onchange="toggleProductVariantActive('${product.id}', '${variant.id}', ${variant.is_active !== false})" />
+                          Активен
+                        </label>
+                        <button class="btn-icon" onclick="openProductVariantEditor('${product.id}', '${variant.id}', '${Utils.escapeHtml(name)}')" title="Редактировать вариант">
+                          <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn-icon" onclick="deleteProductVariantInline('${product.id}', '${variant.id}', '${Utils.escapeHtml(name)}')" title="Удалить вариант">
+                          <i class="fas fa-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                  `;
+                })
+                .join('')}
+              <button
+                type="button"
+                class="btn-link"
+                onclick="openProductVariantsModal('${product.id}', '${Utils.escapeHtml(name)}')"
+                style="padding: 0; background: none; border: none; color: var(--primary-color); font-size: 12px; cursor: pointer;"
+              >
+                Управлять вариантами
+              </button>
+            </div>
+          </div>
+        `
+        : '';
+
       return `
         <div class="list-item">
           <div class="list-item-info" style="flex: 1;">
             <h4>${name}</h4>
             <p style="margin: 4px 0;">${infoParts.join(' • ')}</p>
             ${nutritionInfo.length > 0 ? `<p style="margin: 4px 0; font-size: 12px; color: #888; display: flex; gap: 12px; flex-wrap: wrap;">${nutritionInfo.join(' • ')}</p>` : ''}
+            ${variantsPreview}
           </div>
-          <div class="list-item-actions">
+          <div class="list-item-actions" style="align-self: flex-start;">
+            ${canManageVariants ? `
+            <button class="btn-icon" onclick="openProductVariantsModal('${product.id}', '${Utils.escapeHtml(name)}')" title="Варианты">
+              <i class="fas fa-layer-group"></i>
+            </button>
+            ` : ''}
             ${canManageModifiers ? `
             <button class="btn-icon" onclick="openModifiersModal('${product.id}')" title="Модификаторы">
               <i class="fas fa-cog"></i>
@@ -484,9 +606,95 @@ async function loadProducts(restaurantId = null, categoryId = null) {
         </div>
       `;
     }).join('');
+    bindVariantDragAndDrop(container);
   } catch (error) {
     console.error('Failed to load products:', error);
     Utils.showError('Не удалось загрузить продукты');
+  }
+}
+
+function bindVariantDragAndDrop(container) {
+  if (!container || container.__variantDragBound) return;
+  container.__variantDragBound = true;
+
+  container.addEventListener('dragstart', (event) => {
+    const target = event.target.closest('.variant-card');
+    if (!target) return;
+    draggingVariantId = target.dataset.variantId || null;
+    draggingProductId = target.dataset.productId || null;
+    target.style.opacity = '0.6';
+    event.dataTransfer.effectAllowed = 'move';
+  });
+
+  container.addEventListener('dragend', (event) => {
+    const target = event.target.closest('.variant-card');
+    if (target) {
+      target.style.opacity = '';
+    }
+    draggingVariantId = null;
+    draggingProductId = null;
+  });
+
+  container.addEventListener('dragover', (event) => {
+    const target = event.target.closest('.variant-card');
+    if (!target) return;
+    if (!draggingVariantId || !draggingProductId) return;
+    if (target.dataset.productId !== draggingProductId) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  });
+
+  container.addEventListener('drop', (event) => {
+    const target = event.target.closest('.variant-card');
+    if (!target) return;
+    if (!draggingVariantId || !draggingProductId) return;
+    if (target.dataset.productId !== draggingProductId) return;
+    event.preventDefault();
+    handleVariantDrop(container, draggingProductId, draggingVariantId, target.dataset.variantId);
+  });
+}
+
+async function handleVariantDrop(container, productId, draggedId, targetId) {
+  if (draggedId === targetId) return;
+  const preview = container.querySelector(`[data-variants-preview="${productId}"]`);
+  if (!preview) return;
+
+  const draggedEl = preview.querySelector(`[data-variant-id="${draggedId}"]`);
+  const targetEl = preview.querySelector(`[data-variant-id="${targetId}"]`);
+  if (!draggedEl || !targetEl) return;
+
+  preview.insertBefore(draggedEl, targetEl);
+
+  const cards = Array.from(preview.querySelectorAll('.variant-card'));
+  const updates = cards.map((el, index) => {
+    const id = el.dataset.variantId;
+    return {
+      id,
+      sortOrder: index + 1,
+    };
+  });
+
+  try {
+    await Promise.all(
+      updates.map((update) =>
+        AdminAPI.updateProductVariant(update.id, { sortOrder: update.sortOrder })
+      )
+    );
+
+    const wasOpen = preview.style.display === 'block';
+    await loadProducts(
+      document.getElementById('restaurant-filter').value,
+      document.getElementById('category-filter').value
+    );
+    if (wasOpen) {
+      toggleProductVariantsPreview(productId);
+    }
+    if (currentVariantsProductId === productId) {
+      await loadProductVariants();
+    }
+  } catch (error) {
+    console.error('Failed to reorder variants:', error);
+    Utils.showError(error.message || 'Не удалось изменить порядок вариантов');
   }
 }
 
@@ -508,7 +716,9 @@ async function loadProduct(id) {
     document.getElementById('product-price').value = product.price_kzt?.toString() || '';
     document.getElementById('product-station').value = product.station || 'HOT';
     document.getElementById('product-calories').value = product.calories || '';
-    document.getElementById('product-weight-grams').value = product.weight_grams || product.weightGrams || '';
+    const size = resolveProductSize(product);
+    document.getElementById('product-size-value').value = size ? size.value : '';
+    document.getElementById('product-size-unit').value = size ? size.unit : 'GRAM';
     initialComposition = Array.isArray(product.composition) ? product.composition : [];
     ingredientsDirty = false;
     selectedIngredients = (product.ingredients || [])
@@ -601,6 +811,8 @@ function openProductModal() {
   document.getElementById('product-modifiers-section').style.display = 'none';
   document.getElementById('product-images-preview').style.display = 'none';
   document.getElementById('product-images-current').style.display = 'none';
+  document.getElementById('product-size-value').value = '';
+  document.getElementById('product-size-unit').value = 'GRAM';
   ingredientsDirty = false;
   initialComposition = [];
   resetSelectedIngredients();
@@ -618,8 +830,13 @@ async function saveProduct() {
       : initialComposition;
     
     const caloriesValue = document.getElementById('product-calories').value.trim();
-    const weightGramsValue = document.getElementById('product-weight-grams').value.trim();
-    
+    const sizeValueRaw = document.getElementById('product-size-value').value.trim();
+    const sizeValue =
+      sizeValueRaw === '' ? undefined : parseInt(sizeValueRaw, 10);
+    const sizeUnit =
+      sizeValue === undefined
+        ? undefined
+        : document.getElementById('product-size-unit').value;
     const data = {
       restaurantId: document.getElementById('product-restaurant').value,
       categoryId: document.getElementById('product-category').value,
@@ -631,7 +848,8 @@ async function saveProduct() {
       descriptionEn: document.getElementById('product-description-en').value || undefined,
       priceKzt: document.getElementById('product-price').value,
       calories: caloriesValue ? parseInt(caloriesValue, 10) : undefined,
-      weightGrams: weightGramsValue ? parseInt(weightGramsValue, 10) : undefined,
+      sizeValue,
+      sizeUnit,
       composition: composition,
       station: document.getElementById('product-station').value,
       isActive: true,
@@ -825,6 +1043,232 @@ async function editProduct(id) {
   }
 }
 
+function openProductVariantsModal(productId, productName = '') {
+  currentVariantsProductId = productId;
+  const modal = document.getElementById('product-variants-modal');
+  const title = document.getElementById('product-variants-title');
+  if (title) {
+    title.textContent = productName
+      ? `Варианты: ${productName}`
+      : 'Варианты продукта';
+  }
+  resetProductVariantForm();
+  modal.classList.add('active');
+  loadProductVariants();
+}
+
+function closeProductVariantsModal() {
+  const modal = document.getElementById('product-variants-modal');
+  modal.classList.remove('active');
+  currentVariantsProductId = null;
+  currentProductVariants = [];
+}
+
+function toggleProductVariantsPreview(productId) {
+  const container = document.getElementById(`product-variants-preview-${productId}`);
+  if (!container) return;
+  const isOpen = container.style.display === 'block';
+  container.style.display = isOpen ? 'none' : 'block';
+  const toggleButton = document.querySelector(`[data-toggle-product-variants="${productId}"]`);
+  if (toggleButton) {
+    const baseText = toggleButton.textContent?.split(' • ')[0] || toggleButton.textContent;
+    toggleButton.textContent = isOpen ? baseText : `${baseText} • Скрыть`;
+  }
+  const icon = document.querySelector(`[data-toggle-icon="${productId}"]`);
+  if (icon) {
+    icon.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+  }
+}
+
+async function openProductVariantEditor(productId, variantId, productName = '') {
+  currentVariantsProductId = productId;
+  const modal = document.getElementById('product-variants-modal');
+  const title = document.getElementById('product-variants-title');
+  if (title) {
+    title.textContent = productName
+      ? `Варианты: ${productName}`
+      : 'Варианты продукта';
+  }
+  resetProductVariantForm();
+  modal.classList.add('active');
+  await loadProductVariants();
+  editProductVariant(variantId);
+}
+
+async function deleteProductVariantInline(productId, variantId, productName = '') {
+  if (!confirm('Удалить этот вариант?')) {
+    return;
+  }
+
+  try {
+    await AdminAPI.deleteProductVariant(variantId);
+    Utils.showSuccess('Вариант удален');
+    await loadProducts(
+      document.getElementById('restaurant-filter').value,
+      document.getElementById('category-filter').value
+    );
+    if (currentVariantsProductId === productId) {
+      await loadProductVariants();
+    }
+  } catch (error) {
+    console.error('Failed to delete product variant:', error);
+    Utils.showError(error.message || 'Не удалось удалить вариант');
+  }
+}
+
+async function toggleProductVariantActive(productId, variantId, isActive) {
+  try {
+    await AdminAPI.updateProductVariant(variantId, { isActive: !isActive });
+    await loadProducts(
+      document.getElementById('restaurant-filter').value,
+      document.getElementById('category-filter').value
+    );
+    if (currentVariantsProductId === productId) {
+      await loadProductVariants();
+    }
+  } catch (error) {
+    console.error('Failed to toggle variant:', error);
+    Utils.showError(error.message || 'Не удалось изменить доступность варианта');
+  }
+}
+
+function resetProductVariantForm() {
+  document.getElementById('product-variant-id').value = '';
+  document.getElementById('product-variant-name-ru').value = '';
+  document.getElementById('product-variant-name-kk').value = '';
+  document.getElementById('product-variant-name-en').value = '';
+  document.getElementById('product-variant-price').value = '';
+  document.getElementById('product-variant-sort').value = '0';
+  document.getElementById('product-variant-active').checked = true;
+}
+
+async function loadProductVariants() {
+  const container = document.getElementById('product-variants-list-container');
+  if (!currentVariantsProductId) {
+    container.innerHTML = '<div class="empty-state">Продукт не выбран.</div>';
+    return;
+  }
+
+  try {
+    container.innerHTML = '<div class="loading">Загрузка...</div>';
+    const response = await AdminAPI.getProductVariants(currentVariantsProductId);
+    const variants = response.data?.data || response.data || [];
+    currentProductVariants = variants;
+
+    if (variants.length === 0) {
+      container.innerHTML = '<div class="empty-state">Вариантов нет.</div>';
+      return;
+    }
+
+    container.innerHTML = variants
+      .map((variant) => {
+        const name = variant.name_ru || variant.name_kk || variant.name_en || 'Вариант';
+        const price = Utils.formatPrice(variant.price_kzt || 0);
+        return `
+          <div class="list-item" style="padding: 12px;">
+            <div class="list-item-info">
+              <h4>${Utils.escapeHtml(name)}</h4>
+              <p style="margin: 4px 0; font-size: 12px; color: #666;">
+                ${price} ₸
+              </p>
+              <p style="margin: 4px 0; font-size: 12px; color: #888;">
+                ${variant.is_active ? 'Активен' : 'Неактивен'}
+              </p>
+            </div>
+            <div class="list-item-actions" style="display: flex; gap: 10px; align-items: center;">
+              <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #555; cursor: pointer;">
+                <input type="checkbox" ${variant.is_active !== false ? 'checked' : ''} onchange="toggleProductVariantActive('${currentVariantsProductId}', '${variant.id}', ${variant.is_active !== false})" />
+                Активен
+              </label>
+              <button class="btn-icon" onclick="editProductVariant('${variant.id}')" title="Редактировать">
+                <i class="fas fa-edit"></i>
+              </button>
+              <button class="btn-icon" onclick="deleteProductVariant('${variant.id}')" title="Удалить">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      })
+      .join('');
+  } catch (error) {
+    console.error('Failed to load product variants:', error);
+    container.innerHTML = '<div class="empty-state">Не удалось загрузить варианты.</div>';
+  }
+}
+
+function editProductVariant(variantId) {
+  const variant = currentProductVariants.find((item) => item.id === variantId);
+  if (!variant) {
+    Utils.showError('Вариант не найден');
+    return;
+  }
+
+  document.getElementById('product-variant-id').value = variant.id;
+  document.getElementById('product-variant-name-ru').value = variant.name_ru || '';
+  document.getElementById('product-variant-name-kk').value = variant.name_kk || '';
+  document.getElementById('product-variant-name-en').value = variant.name_en || '';
+  document.getElementById('product-variant-price').value = variant.price_kzt || '';
+  document.getElementById('product-variant-sort').value = variant.sort_order ?? 0;
+  document.getElementById('product-variant-active').checked = variant.is_active !== false;
+}
+
+async function saveProductVariant() {
+  if (!currentVariantsProductId) {
+    Utils.showError('Продукт не выбран');
+    return;
+  }
+
+  const variantId = document.getElementById('product-variant-id').value || null;
+  const payload = {
+    nameRu: document.getElementById('product-variant-name-ru').value.trim(),
+    nameKk: document.getElementById('product-variant-name-kk').value.trim(),
+    nameEn: document.getElementById('product-variant-name-en').value.trim(),
+    priceKzt: document.getElementById('product-variant-price').value.trim(),
+    sortOrder: parseInt(document.getElementById('product-variant-sort').value || '0', 10),
+    isActive: document.getElementById('product-variant-active').checked,
+  };
+
+  if (!payload.nameRu || !payload.nameKk || !payload.nameEn || !payload.priceKzt) {
+    Utils.showError('Заполните название и цену');
+    return;
+  }
+
+  try {
+    if (variantId) {
+      await AdminAPI.updateProductVariant(variantId, payload);
+      Utils.showSuccess('Вариант обновлен');
+    } else {
+      await AdminAPI.createProductVariant(currentVariantsProductId, payload);
+      Utils.showSuccess('Вариант создан');
+    }
+    resetProductVariantForm();
+    await loadProductVariants();
+    await loadProducts(
+      document.getElementById('restaurant-filter').value,
+      document.getElementById('category-filter').value,
+    );
+  } catch (error) {
+    console.error('Failed to save product variant:', error);
+    Utils.showError(error.message || 'Не удалось сохранить вариант');
+  }
+}
+
+async function deleteProductVariant(variantId) {
+  if (!confirm('Вы уверены, что хотите удалить этот вариант?')) {
+    return;
+  }
+
+  try {
+    await AdminAPI.deleteProductVariant(variantId);
+    Utils.showSuccess('Вариант удален');
+    await loadProductVariants();
+  } catch (error) {
+    console.error('Failed to delete product variant:', error);
+    Utils.showError(error.message || 'Не удалось удалить вариант');
+  }
+}
+
 // Экспорт
 window.openProductModal = openProductModal;
 window.closeProductModal = closeProductModal;
@@ -832,6 +1276,15 @@ window.editProduct = editProduct;
 window.deleteProduct = deleteProduct;
 window.loadProductModifiers = loadProductModifiers;
 window.removeProductImage = removeProductImage;
+window.openProductVariantsModal = openProductVariantsModal;
+window.closeProductVariantsModal = closeProductVariantsModal;
+window.toggleProductVariantsPreview = toggleProductVariantsPreview;
+window.openProductVariantEditor = openProductVariantEditor;
+window.deleteProductVariantInline = deleteProductVariantInline;
+window.toggleProductVariantActive = toggleProductVariantActive;
+window.resetProductVariantForm = resetProductVariantForm;
+window.editProductVariant = editProductVariant;
+window.deleteProductVariant = deleteProductVariant;
 // Делаем currentProductId доступным глобально для использования в onclick
 Object.defineProperty(window, 'currentProductId', {
   get: function() { return currentProductId; },

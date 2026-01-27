@@ -154,6 +154,7 @@
           'APPLE_PAY': 'Apple Pay',
         };
         const paymentMethodLabel = paymentMethodLabels[order.payment_method] || order.payment_method || 'Не указано';
+        const waiterName = order.waiter?.account?.name || order.waiter?.account?.username || order.waiter?.account?.phone || 'Не назначен';
 
         // Формируем список позиций
         const itemsHtml = order.items && order.items.length > 0 ? order.items.map(item => {
@@ -161,6 +162,8 @@
           const unitPrice = parseFloat(item.unit_price_kzt || 0);
           const quantity = item.qty || 1;
           const lineTotal = parseFloat(item.line_total_kzt || 0);
+          const variantName = item.snapshot_variant_name_ru || item.snapshot_variant_name_kk || item.snapshot_variant_name_en;
+          const variantLabel = variantName || '';
           
           // Модификаторы
           let modifiersHtml = '';
@@ -185,6 +188,7 @@
                   <div style="font-weight: 500; margin-bottom: 4px;">
                     ${Utils.escapeHtml(itemName)}
                   </div>
+                  ${variantLabel ? `<div style="font-size: 13px; color: #666; margin-top: 4px;">Вариант: ${Utils.escapeHtml(variantLabel)}</div>` : ''}
                   ${modifiersHtml}
                   <div style="font-size: 13px; color: #666; margin-top: 4px;">
                     ${Utils.formatPrice(unitPrice)} ₸ × ${quantity}
@@ -211,6 +215,9 @@
           </div>
           <div style="margin-bottom: 12px;">
             <strong>Стол:</strong> №${order.table?.number || order.snapshot_table_number || 'Не указан'}
+          </div>
+          <div style="margin-bottom: 12px;">
+            <strong>Официант:</strong> ${Utils.escapeHtml(waiterName)}
           </div>
           <div style="margin-bottom: 12px;">
             <strong>Способ оплаты:</strong> ${paymentMethodLabel}
@@ -602,4 +609,3 @@
   </script>
 </body>
 </html>
-

@@ -62,10 +62,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   const backBtn = document.getElementById('back-btn');
   const loadingIndicator = document.getElementById('loading');
   const modifiersContainer = document.getElementById('modifiers-container');
+  const optionVariantsContainer = document.getElementById('product-option-variants');
+  const optionVariantsList = document.getElementById('product-option-variants-list');
 
   let selectedQuantity = 1;
   const minQuantity = 1;
   const maxQuantity = 10;
+  let selectedProductVariantId = null;
+  let selectedProductVariant = null;
 
   function ensureCartBadgeWebSocket() {
     if (isPublic || !sessionId) {
@@ -152,6 +156,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       ? '₸' 
       : (menu.restaurant?.currency || '₸');
     renderProduct(foundProduct, currency);
+    renderProductOptionVariants(foundProduct, currency);
     
     // Инициализировать модификаторы
     if (foundProduct.modifiers && foundProduct.modifiers.length > 0) {
@@ -233,7 +238,13 @@ document.addEventListener('DOMContentLoaded', async () => {
           }));
 
         try {
-          await API.addToCart(sessionId, productId, selectedQuantity, modifiersToSend);
+          await API.addToCart(
+            sessionId,
+            productId,
+            selectedQuantity,
+            modifiersToSend,
+            selectedProductVariantId,
+          );
         } catch (error) {
           // Если корзина не найдена (истекла или была удалена после заказа), создаем новую
           if (error.message && error.message.includes('Cart not found')) {
@@ -250,7 +261,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             
             // Пробуем добавить товар снова с новым sessionId
-        await API.addToCart(sessionId, productId, selectedQuantity, modifiersToSend);
+        await API.addToCart(
+          sessionId,
+          productId,
+          selectedQuantity,
+          modifiersToSend,
+          selectedProductVariantId,
+        );
           } else {
             throw error;
           }
@@ -364,7 +381,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const imageUrl = Utils.getProductImageUrl(imageData, product.id, 0);
     const name = Utils.getProductName(product.name);
     const description = Utils.getProductDescription(product.description);
-    const basePrice = parseFloat(product.price);
+    const basePrice = getBasePrice(product);
     const totalPrice = calculateTotalPrice(basePrice);
 
     if (productImage) {
@@ -414,14 +431,174 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  function getBasePrice(product) {
+    const variantPrice = selectedProductVariant?.price;
+    if (variantPrice !== undefined && variantPrice !== null) {
+      return parseFloat(variantPrice);
+    }
+    return parseFloat(product.price);
+  }
+
+  function getProductVariants(product) {
+    const variants = product.variants || product.product_variants || [];
+    return (variants || []).filter((variant) => variant && variant.isActive !== false);
+  }
+
+  function getVariantLabel(variant) {
+    return Utils.getProductName(variant.name) || 'Вариант';
+  }
+
+  function renderProductOptionVariants(product, currency = '₸') {
+    if (!optionVariantsContainer || !optionVariantsList) {
+      return;
+    }
+
+    const variants = getProductVariants(product);
+    if (variants.length === 0) {
+      optionVariantsContainer.style.display = 'none';
+      selectedProductVariantId = null;
+      selectedProductVariant = null;
+      return;
+    }
+
+    variants.sort((a, b) => {
+      const aOrder = a.sortOrder ?? 0;
+      const bOrder = b.sortOrder ?? 0;
+      if (aOrder !== bOrder) {
+        return aOrder - bOrder;
+      }
+      const aLabel = getVariantLabel(a);
+      const bLabel = getVariantLabel(b);
+      return aLabel.localeCompare(bLabel, 'ru');
+    });
+
+    if (!selectedProductVariantId || !variants.find((v) => v.id === selectedProductVariantId)) {
+      selectedProductVariantId = variants[0].id;
+    }
+    selectedProductVariant = variants.find((v) => v.id === selectedProductVariantId) || variants[0];
+
+    if (variants.length === 1) {
+      const singleVariant = variants[0];
+      const label = getVariantLabel(singleVariant);
+      optionVariantsList.innerHTML = `
+        <div style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid #ddd; border-radius: 999px; font-size: 14px; color: #333; background: #fafafa;">
+          ${escapeHtml(label)}${singleVariant.price ? ` • ${Utils.formatPrice(singleVariant.price)} ${currency}` : ''}
+        </div>
+      `;
+      optionVariantsContainer.style.display = 'block';
+      updatePrice();
+      return;
+    }
+
+    optionVariantsList.innerHTML = variants
+      .map((variant) => {
+        const isActive = variant.id === selectedProductVariantId;
+        const label = getVariantLabel(variant);
+        return `
+          <button
+            type="button"
+            class="variant-btn${isActive ? ' active' : ''}"
+            data-variant-id="${variant.id}"
+            ${isActive ? 'aria-current="true"' : ''}
+            title="${escapeHtml(label)}"
+          >
+            ${escapeHtml(label)}${variant.price ? ` • ${Utils.formatPrice(variant.price)} ${currency}` : ''}
+          </button>
+        `;
+      })
+      .join('');
+
+    optionVariantsContainer.style.display = 'block';
+
+    optionVariantsList.querySelectorAll('.variant-btn').forEach((button) => {
+      button.addEventListener('click', () => {
+        const targetId = button.dataset.variantId;
+        if (!targetId) return;
+        selectedProductVariantId = targetId;
+        selectedProductVariant = variants.find((v) => v.id === targetId) || variants[0];
+        optionVariantsList.querySelectorAll('.variant-btn').forEach((btn) => {
+          btn.classList.toggle('active', btn === button);
+        });
+        updatePrice();
+      });
+    });
+
+    updatePrice();
+  }
+
+  function getVariantLabel(product) {
+    const size = resolveProductSize(product);
+    if (size) {
+      return formatSizeLabel(size);
+    }
+    const name = Utils.getProductName(product.name);
+    return name || 'Вариант';
+  }
+
+  function resolveProductSize(product) {
+    const sizeUnit =
+      product.sizeUnit ||
+      product.size_unit ||
+      (product.volumeMl || product.volume_ml ? 'ML' : undefined) ||
+      (product.weightGrams || product.weight_grams ? 'GRAM' : null);
+    const sizeValue =
+      product.sizeValue ??
+      (sizeUnit === 'ML'
+        ? product.volumeMl || product.volume_ml
+        : sizeUnit === 'GRAM'
+          ? product.weightGrams || product.weight_grams
+          : null);
+
+    if (!sizeUnit || sizeValue === null || sizeValue === undefined) {
+      return null;
+    }
+
+    return { unit: sizeUnit, value: sizeValue };
+  }
+
+  function formatSizeLabel(size) {
+    if (!size) return '';
+    if (size.unit === 'ML') {
+      if (size.value >= 1000) {
+        const liters = (size.value / 1000).toFixed(2).replace(/\.?0+$/, '');
+        return `${liters} л`;
+      }
+      return `${size.value} мл`;
+    }
+    if (size.value >= 1000) {
+      const kilos = (size.value / 1000).toFixed(2).replace(/\.?0+$/, '');
+      return `${kilos} кг`;
+    }
+    return `${size.value} г`;
+  }
+
   /**
    * Отобразить информацию о калориях и весе
    */
   function renderProductInfo(product) {
+    const ratingEl = document.getElementById('product-rating');
+    const ratingValueEl = document.getElementById('product-rating-value');
     const caloriesEl = document.getElementById('product-calories');
     const caloriesValueEl = document.getElementById('product-calories-value');
     const weightEl = document.getElementById('product-weight');
     const weightValueEl = document.getElementById('product-weight-value');
+
+    const ratingAverage =
+      product.ratingAverage !== null && product.ratingAverage !== undefined
+        ? product.ratingAverage
+        : null;
+    const reviewsCount =
+      product.reviewsCount !== null && product.reviewsCount !== undefined
+        ? product.reviewsCount
+        : null;
+
+    if (ratingAverage !== null && ratingEl && ratingValueEl) {
+      const value = ratingAverage.toFixed(1);
+      ratingValueEl.textContent = reviewsCount ? `${value} (${reviewsCount})` : value;
+      ratingEl.style.display = 'flex';
+    } else if (ratingEl) {
+      ratingEl.style.display = 'none';
+    }
     
     if (product.calories && caloriesEl && caloriesValueEl) {
       caloriesValueEl.textContent = `${product.calories} Ккал`;
@@ -430,8 +607,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       caloriesEl.style.display = 'none';
     }
     
-    if (product.weightGrams && weightEl && weightValueEl) {
-      weightValueEl.textContent = `${product.weightGrams} гр`;
+    const size = resolveProductSize(product);
+    if (size && weightEl && weightValueEl) {
+      weightValueEl.textContent = formatSizeLabel(size);
       weightEl.style.display = 'flex';
     } else if (weightEl) {
       weightEl.style.display = 'none';
@@ -663,7 +841,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function updatePrice() {
     if (!currentProduct || !productPrice) return;
     
-    const basePrice = parseFloat(currentProduct.price);
+    const basePrice = getBasePrice(currentProduct);
     const totalPrice = calculateTotalPrice(basePrice);
     const currency = isPublic && currentProduct.restaurant?.currency === 'KZT' 
       ? '₸' 

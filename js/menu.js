@@ -274,20 +274,43 @@ document.addEventListener('DOMContentLoaded', async () => {
     const imageUrl = Utils.getProductImageUrl(imageData, product.id, 0);
     const name = Utils.getProductName(product.name);
     const description = Utils.getProductDescription(product.description);
-    const price = Utils.formatPrice(product.price);
+    const variants = product.variants || [];
+    const hasVariants = variants.length > 0;
+    const minVariantPrice = hasVariants
+      ? Math.min(...variants.map((variant) => parseFloat(variant.price || 0)))
+      : null;
+    const priceValue = hasVariants && Number.isFinite(minVariantPrice)
+      ? minVariantPrice
+      : parseFloat(product.price || 0);
+    const price = Utils.formatPrice(priceValue);
+    const pricePrefix = hasVariants ? 'от ' : '';
+    const ratingAverage =
+      product.ratingAverage !== null && product.ratingAverage !== undefined
+        ? product.ratingAverage
+        : null;
+    const reviewsCount =
+      product.reviewsCount !== null && product.reviewsCount !== undefined
+        ? product.reviewsCount
+        : null;
+    const ratingLabel =
+      ratingAverage !== null
+        ? reviewsCount
+          ? `${ratingAverage.toFixed(1)} (${reviewsCount})`
+          : ratingAverage.toFixed(1)
+        : null;
 
     card.innerHTML = `
       <div class="product-image-container">
         <img src="${imageUrl}" alt="${name}" class="product-image" onerror="this.src='https://openlab.citytech.cuny.edu/chenry-eportfolio/wp-content/themes/koji/assets/images/default-fallback-image.png'" />
-        <div class="product-rating">★ 4.5</div>
+        ${ratingLabel ? `<div class="product-rating">${ratingLabel}</div>` : ''}
       </div>
       <div class="product-info">
         <h3 class="product-name">${name}</h3>
         <p class="product-description">${description || 'Описание отсутствует'}</p>
         <div class="product-footer">
-          <span class="product-price">${price} ₸</span>
+          <span class="product-price">${pricePrefix}${price} ₸</span>
           <button class="btn-add-to-cart" data-product-id="${product.id}">
-            Добавить
+            ${hasVariants ? 'Выбрать' : 'Добавить'}
           </button>
         </div>
       </div>
@@ -306,6 +329,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const addBtn = card.querySelector('.btn-add-to-cart');
     addBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
+      if (hasVariants) {
+        Utils.navigateToProduct(product.id);
+        return;
+      }
       await handleAddToCart(product.id, 1);
     });
 

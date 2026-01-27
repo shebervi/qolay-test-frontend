@@ -446,6 +446,12 @@
   line-height: 1.5;
 }
 
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 13px;
+  line-height: 1.2;
+}
+
 /* Ingredients autocomplete */
 .ingredient-input-wrap {
   position: relative;
@@ -520,32 +526,6 @@
   font-size: 12px;
   color: var(--admin-text-secondary);
   padding: 6px 0;
-}
-
-.ingredient-allergen {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 12px;
-  background: #fee2e2;
-  color: #b91c1c;
-  font-size: 11px;
-  font-weight: 600;
-  margin-left: 8px;
-}
-
-.ingredient-allergen-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--admin-text-secondary);
-  margin-top: 6px;
-}
-
-.ingredient-allergen-toggle input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
 }
 
 .ingredient-card-actions {
@@ -951,6 +931,7 @@
   .admin-form {
     padding: 20px;
   }
+
 }
 
 /* Поле выбора даты */
