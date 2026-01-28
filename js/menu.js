@@ -268,9 +268,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const card = document.createElement('div');
     card.className = 'product-card';
 
-    // Используем images если есть, иначе imageKeys
-    const images = product.images || [];
-    const imageData = images.length > 0 ? images : (product.imageKeys || []);
+    // Используем imageUrls если есть, иначе images/imageKeys
+    const imageData = (product.imageUrls && product.imageUrls.length > 0)
+      ? product.imageUrls
+      : ((product.images && product.images.length > 0) ? product.images : (product.imageKeys || []));
     const imageUrl = Utils.getProductImageUrl(imageData, product.id, 0);
     const name = Utils.getProductName(product.name);
     const description = Utils.getProductDescription(product.description);

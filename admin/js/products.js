@@ -490,6 +490,9 @@ async function loadProducts(restaurantId = null, categoryId = null) {
       const restaurant = restaurants.find(r => r.id === product.restaurant_id);
       const category = categories.find(c => c.id === product.category_id);
       const name = product.name_ru || product.name_kk || product.name_en;
+      const imageUrl = (product.imageUrls && product.imageUrls.length > 0)
+        ? product.imageUrls[0]
+        : 'https://openlab.citytech.cuny.edu/chenry-eportfolio/wp-content/themes/koji/assets/images/default-fallback-image.png';
       
       const infoParts = [
         restaurant?.name || 'N/A',
@@ -574,7 +577,8 @@ async function loadProducts(restaurantId = null, categoryId = null) {
         : '';
 
       return `
-        <div class="list-item">
+        <div class="list-item" style="display: flex; gap: 16px; align-items: flex-start;">
+          <img src="${imageUrl}" alt="${Utils.escapeHtml(name)}" style="width: 64px; height: 64px; border-radius: 10px; object-fit: cover; border: 1px solid #eee; flex-shrink: 0;" onerror="this.src='https://openlab.citytech.cuny.edu/chenry-eportfolio/wp-content/themes/koji/assets/images/default-fallback-image.png'">
           <div class="list-item-info" style="flex: 1;">
             <h4>${name}</h4>
             <p style="margin: 4px 0;">${infoParts.join(' • ')}</p>
@@ -926,9 +930,12 @@ async function loadProductImages(productId, product) {
 
   const images = product.images || [];
   const imageKeys = product.imageKeys || [];
+  const imageUrls = product.imageUrls || [];
 
-  if (images.length > 0 || imageKeys.length > 0) {
-    const imagesToShow = images.length > 0 ? images : imageKeys.map((key, index) => ({ id: `temp-${index}`, imageKey: key }));
+  if (images.length > 0 || imageKeys.length > 0 || imageUrls.length > 0) {
+    const imagesToShow = images.length > 0
+      ? images
+      : imageKeys.map((key, index) => ({ id: `temp-${index}`, imageKey: key }));
     
     imagesToShow.forEach((img, index) => {
       const imageItem = document.createElement('div');
@@ -937,9 +944,10 @@ async function loadProductImages(productId, product) {
       imageItem.style.margin = '8px';
       const imageId = img.id || `temp-${index}`;
       const imageKey = img.imageKey || img;
-      const imageUrl = images.length > 0 
-        ? `${CONFIG.API_BASE_URL}/products/${productId}/images/${imageId}`
-        : `${CONFIG.API_BASE_URL}/products/${productId}/image`;
+      const imageUrl = imageUrls[index]
+        || (images.length > 0 
+          ? `${CONFIG.API_BASE_URL}/products/${productId}/images/${imageId}`
+          : `${CONFIG.API_BASE_URL}/products/${productId}/image`);
       
       imageItem.innerHTML = `
         <img src="${imageUrl}" alt="Изображение ${index + 1}" style="max-width: 150px; max-height: 150px; border-radius: 8px; border: 1px solid #ddd; object-fit: cover; display: block;" onerror="this.src='https://openlab.citytech.cuny.edu/chenry-eportfolio/wp-content/themes/koji/assets/images/default-fallback-image.png'">

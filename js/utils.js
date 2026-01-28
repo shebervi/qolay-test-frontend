@@ -156,7 +156,7 @@ function getProductDescription(description) {
 
 /**
  * Получить URL изображения продукта
- * @param {string|string[]|object[]} imageData - Ключ изображения, массив ключей или массив объектов images
+ * @param {string|string[]|object[]} imageData - URL изображения, массив URL, ключи или массив объектов images
  * @param {string} productId - ID продукта (опционально, используется для получения изображения через API)
  * @param {number} index - Индекс изображения в массиве (по умолчанию 0 - первое изображение)
  * @returns {string}
@@ -167,14 +167,26 @@ function getProductImageUrl(imageData, productId = null, index = 0) {
   if (!productId) {
     return fallbackImage;
   }
+
+  const isUrl = (value) => typeof value === 'string' && /^https?:\/\//i.test(value);
   
   // Если передан массив объектов images с id
   if (Array.isArray(imageData) && imageData.length > 0) {
     const imageItem = imageData[index] || imageData[0];
     
+    // Если это URL строка
+    if (isUrl(imageItem)) {
+      return imageItem;
+    }
+
     // Если это объект с id (из images массива)
     if (imageItem && typeof imageItem === 'object' && imageItem.id) {
       return `${CONFIG.API_BASE_URL}/products/${productId}/images/${imageItem.id}`;
+    }
+
+    // Если это объект с готовым URL
+    if (imageItem && typeof imageItem === 'object' && imageItem.imageUrl) {
+      return imageItem.imageUrl;
     }
     
     // Если это просто строка (imageKey)
@@ -190,7 +202,15 @@ function getProductImageUrl(imageData, productId = null, index = 0) {
   
   // Если передана строка imageKey
   if (imageData && typeof imageData === 'string') {
+    if (isUrl(imageData)) {
+      return imageData;
+    }
     return `${CONFIG.API_BASE_URL}/products/${productId}/image`;
+  }
+
+  // Если передан объект с imageUrl
+  if (imageData && typeof imageData === 'object' && imageData.imageUrl) {
+    return imageData.imageUrl;
   }
   
   return fallbackImage;
