@@ -72,6 +72,16 @@ function getSearchQuery() {
   return document.getElementById('ingredient-search').value.trim();
 }
 
+function getHeaderTranslateProvider() {
+  const select = document.getElementById('ingredients-translate-provider');
+  return select?.value || 'auto';
+}
+
+function getModalTranslateProvider() {
+  const select = document.getElementById('ingredient-translate-provider');
+  return select?.value || getHeaderTranslateProvider();
+}
+
 async function loadRestaurants() {
   try {
     const response = await AdminAPI.getRestaurants();
@@ -160,6 +170,10 @@ function renderIngredients(items) {
 
 function openIngredientModal() {
   document.getElementById('ingredient-modal').classList.add('active');
+  const providerSelect = document.getElementById('ingredient-translate-provider');
+  if (providerSelect) {
+    providerSelect.value = getHeaderTranslateProvider();
+  }
 }
 
 function closeIngredientModal() {
@@ -239,11 +253,18 @@ async function translateIngredientCard(id) {
   }
 
   try {
+    const provider = getHeaderTranslateProvider();
+    const translateResponse = await AdminAPI.translateIngredient({
+      restaurantId: ingredient.restaurant_id,
+      nameRu: ingredient.name_ru,
+      provider,
+    });
+    const translated = translateResponse?.data?.data || translateResponse?.data || translateResponse;
     await AdminAPI.updateIngredient(id, {
       restaurantId: ingredient.restaurant_id,
       nameRu: ingredient.name_ru,
-      nameKk: ingredient.name_kk || ingredient.name_ru,
-      nameEn: ingredient.name_en || ingredient.name_ru,
+      nameKk: translated?.nameKk || ingredient.name_kk || ingredient.name_ru,
+      nameEn: translated?.nameEn || ingredient.name_en || ingredient.name_ru,
     });
     Utils.showSuccess('Перевод обновлен');
     await loadIngredients();
@@ -253,18 +274,35 @@ async function translateIngredientCard(id) {
   }
 }
 
-function translateIngredientFromRu() {
+async function translateIngredientFromRu() {
   const ruValue = document.getElementById('ingredient-name-ru').value.trim();
-  if (!ruValue) return;
+  if (!ruValue) {
+    Utils.showError('Введите название на русском');
+    return;
+  }
+
+  const restaurantId = document.getElementById('ingredient-restaurant').value;
+  if (!restaurantId) {
+    Utils.showError('Выберите ресторан');
+    return;
+  }
 
   const kkInput = document.getElementById('ingredient-name-kk');
   const enInput = document.getElementById('ingredient-name-en');
+  const provider = getModalTranslateProvider();
 
-  if (!kkInput.value.trim()) {
-    kkInput.value = ruValue;
-  }
-  if (!enInput.value.trim()) {
-    enInput.value = ruValue;
+  try {
+    const response = await AdminAPI.translateIngredient({
+      restaurantId,
+      nameRu: ruValue,
+      provider,
+    });
+    const translated = response?.data?.data || response?.data || response;
+    if (translated?.nameKk) kkInput.value = translated.nameKk;
+    if (translated?.nameEn) enInput.value = translated.nameEn;
+  } catch (error) {
+    console.error('Failed to translate ingredient from RU:', error);
+    Utils.showError('Не удалось перевести ингредиент');
   }
 }
 
@@ -284,12 +322,19 @@ async function translateMissingIngredients() {
   }
 
   try {
+    const provider = getHeaderTranslateProvider();
     for (const item of updates) {
+      const translateResponse = await AdminAPI.translateIngredient({
+        restaurantId: item.restaurant_id,
+        nameRu: item.name_ru,
+        provider,
+      });
+      const translated = translateResponse?.data?.data || translateResponse?.data || translateResponse;
       await AdminAPI.updateIngredient(item.id, {
         restaurantId: item.restaurant_id,
         nameRu: item.name_ru,
-        nameKk: item.name_kk || item.name_ru,
-        nameEn: item.name_en || item.name_ru,
+        nameKk: translated?.nameKk || item.name_kk || item.name_ru,
+        nameEn: translated?.nameEn || item.name_en || item.name_ru,
       });
     }
     Utils.showSuccess('Переводы заполнены');

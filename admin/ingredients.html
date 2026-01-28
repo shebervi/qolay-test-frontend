@@ -66,6 +66,11 @@
             <option value="">Все рестораны</option>
           </select>
           <input id="ingredient-search" class="input" type="text" placeholder="Поиск по названию" style="max-width: 240px; margin-right: 12px;">
+          <select id="ingredients-translate-provider" class="input" style="max-width: 160px; margin-right: 12px;">
+            <option value="auto">Авто</option>
+            <option value="google" selected>Google</option>
+            <option value="openai">OpenAI</option>
+          </select>
           <button class="btn btn-secondary" onclick="translateMissingIngredients()" style="margin-right: 12px;">
             Перевести пустые
           </button>
@@ -136,6 +141,11 @@
           <button type="button" class="btn btn-secondary" onclick="translateIngredientFromRu()">
             Перевести из RU
           </button>
+          <select id="ingredient-translate-provider" class="input" style="max-width: 140px;">
+            <option value="auto">Авто</option>
+            <option value="google" selected>Google</option>
+            <option value="openai">OpenAI</option>
+          </select>
           <span style="font-size: 12px; color: #666; align-self: center;">Черновик: заполнит пустые поля из RU.</span>
         </div>
 

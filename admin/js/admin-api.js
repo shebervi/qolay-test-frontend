@@ -424,6 +424,13 @@ async function adminDeleteIngredient(id) {
   });
 }
 
+async function adminTranslateIngredient(data) {
+  return apiRequest('/ingredients/auto-translate', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
 async function adminSetProductIngredients(productId, ingredients) {
   return apiRequest(`/products/${productId}/ingredients`, {
     method: 'POST',
@@ -946,6 +953,7 @@ if (typeof window !== 'undefined') {
     createIngredient: adminCreateIngredient,
     updateIngredient: adminUpdateIngredient,
     deleteIngredient: adminDeleteIngredient,
+    translateIngredient: adminTranslateIngredient,
     setProductIngredients: adminSetProductIngredients,
     // Modifiers
     getModifierGroups: adminGetModifierGroups,
